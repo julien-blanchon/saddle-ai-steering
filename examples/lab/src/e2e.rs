@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_e2e::action::Action;
+use saddle_bevy_e2e::action::Action;
 use steering::SteeringSystems;
 
 use crate::scenarios;
@@ -8,8 +8,8 @@ pub struct SteeringLabE2EPlugin;
 
 impl Plugin for SteeringLabE2EPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(bevy_e2e::E2EPlugin);
-        app.configure_sets(Update, bevy_e2e::E2ESet.before(SteeringSystems::Gather));
+        app.add_plugins(saddle_bevy_e2e::E2EPlugin);
+        app.configure_sets(Update, saddle_bevy_e2e::E2ESet.before(SteeringSystems::Gather));
 
         let args: Vec<String> = std::env::args().collect();
         let (scenario_name, handoff) = parse_e2e_args(&args);
@@ -19,7 +19,7 @@ impl Plugin for SteeringLabE2EPlugin {
                 if handoff {
                     scenario.actions.push(Action::Handoff);
                 }
-                bevy_e2e::init_scenario(app, scenario);
+                saddle_bevy_e2e::init_scenario(app, scenario);
             } else {
                 error!(
                     "[steering_lab:e2e] Unknown scenario '{name}'. Available: {:?}",
