@@ -1,0 +1,12 @@
+[package]
+name = "steering_example_support"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+bevy = { workspace = true }
+steering = { workspace = true }
+
+[lints]
+workspace = true

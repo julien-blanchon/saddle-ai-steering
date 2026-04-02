@@ -1,0 +1,535 @@
+#[cfg(feature = "e2e")]
+mod e2e;
+#[cfg(feature = "e2e")]
+mod scenarios;
+
+use bevy::prelude::*;
+#[cfg(feature = "dev")]
+use bevy_brp_extras::BrpExtrasPlugin;
+use steering::{
+    Arrive, ObstacleAvoidance, PathFollowing, PathFollowingState, Pursue, Seek, SteeringAgent,
+    SteeringAutoApply, SteeringDebugSettings, SteeringKinematics, SteeringObstacle,
+    SteeringObstacleShape, SteeringPath, SteeringPlane, SteeringTarget, SteeringTrackedVelocity,
+    Wander,
+};
+
+const DEFAULT_BRP_PORT: u16 = 15_736;
+
+#[derive(Component)]
+struct PathAgent;
+
+#[derive(Component)]
+struct AvoidanceAgent;
+
+#[derive(Component)]
+struct PursuitAgent;
+
+#[derive(Component)]
+struct WanderAgent;
+
+#[derive(Component)]
+struct OrbitTarget;
+
+#[derive(Component)]
+struct MainObstacle;
+
+#[derive(Component)]
+struct OverlayText;
+
+#[derive(Component, Clone, Copy, Debug)]
+struct OrbitMotion {
+    center: Vec3,
+    radius: f32,
+    speed: f32,
+}
+
+#[derive(Resource, Reflect, Clone, Debug)]
+#[reflect(Resource)]
+pub struct LabDiagnostics {
+    pub active_agents: usize,
+    pub path_waypoint: usize,
+    pub path_cycles: u32,
+    pub avoidance_position: Vec3,
+    pub avoidance_min_clearance: f32,
+    pub avoidance_passed_obstacle: bool,
+    pub pursuit_distance: f32,
+    pub wander_speed: f32,
+}
+
+impl Default for LabDiagnostics {
+    fn default() -> Self {
+        Self {
+            active_agents: 0,
+            path_waypoint: 0,
+            path_cycles: 0,
+            avoidance_position: Vec3::ZERO,
+            avoidance_min_clearance: f32::MAX,
+            avoidance_passed_obstacle: false,
+            pursuit_distance: 0.0,
+            wander_speed: 0.0,
+        }
+    }
+}
+
+fn main() {
+    let mut app = App::new();
+    app.insert_resource(ClearColor(Color::srgb(0.04, 0.05, 0.07)));
+    app.insert_resource(SteeringDebugSettings {
+        enabled: true,
+        ..default()
+    });
+    app.init_resource::<LabDiagnostics>();
+    app.register_type::<LabDiagnostics>();
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(Window {
+            title: "steering crate-local lab".into(),
+            resolution: (1420, 900).into(),
+            ..default()
+        }),
+        ..default()
+    }));
+    #[cfg(feature = "dev")]
+    app.add_plugins(BrpExtrasPlugin::with_port(lab_brp_port()));
+    #[cfg(feature = "e2e")]
+    app.add_plugins(e2e::SteeringLabE2EPlugin);
+    app.add_plugins(steering::SteeringPlugin::default());
+    app.add_systems(Startup, setup);
+    app.add_systems(
+        Update,
+        (
+            orbit_targets,
+            toggle_debug,
+            update_lab_diagnostics,
+            update_overlay,
+        ),
+    );
+    app.run();
+}
+
+#[cfg(feature = "dev")]
+fn lab_brp_port() -> u16 {
+    std::env::var("BRP_EXTRAS_PORT")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(DEFAULT_BRP_PORT)
+}
+
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    commands.insert_resource(GlobalAmbientLight {
+        color: Color::WHITE,
+        brightness: 140.0,
+        ..default()
+    });
+
+    commands.spawn((
+        Name::new("Lab Camera"),
+        Camera3d::default(),
+        Transform::from_xyz(0.0, 18.0, 19.0).looking_at(Vec3::new(0.0, 0.7, 0.0), Vec3::Y),
+    ));
+    commands.spawn((
+        Name::new("Directional Light"),
+        DirectionalLight {
+            illuminance: 20_000.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -1.0, 0.7, 0.0)),
+    ));
+    commands.spawn((
+        Name::new("Ground"),
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(28.0, 28.0))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.11, 0.14, 0.18),
+            perceptual_roughness: 0.95,
+            ..default()
+        })),
+    ));
+    commands.spawn((
+        Name::new("Overlay"),
+        OverlayText,
+        Text::new("steering lab"),
+        Node {
+            position_type: PositionType::Absolute,
+            top: px(14.0),
+            left: px(14.0),
+            ..default()
+        },
+    ));
+
+    spawn_obstacle(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        "Center Block",
+        Vec3::new(2.8, 2.0, 2.8),
+        Transform::from_xyz(0.0, 1.0, 0.0),
+        true,
+    );
+    spawn_obstacle(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        "Path Pillar A",
+        Vec3::new(1.4, 1.8, 1.4),
+        Transform::from_xyz(-3.4, 0.9, 3.0),
+        false,
+    );
+    spawn_obstacle(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        "Path Pillar B",
+        Vec3::new(1.2, 1.8, 1.2),
+        Transform::from_xyz(3.6, 0.9, -2.6),
+        false,
+    );
+
+    let avoidance_goal = Vec3::new(8.0, 0.6, 0.0);
+    spawn_marker(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        "Avoidance Goal",
+        Color::srgb(0.96, 0.84, 0.22),
+        avoidance_goal,
+    );
+    spawn_marker(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        "Orbit Target",
+        Color::srgb(0.98, 0.77, 0.32),
+        Vec3::new(0.0, 0.6, 5.0),
+    );
+
+    for (index, point) in [
+        Vec3::new(-5.5, 0.6, -4.5),
+        Vec3::new(5.5, 0.6, -4.5),
+        Vec3::new(5.5, 0.6, 4.5),
+        Vec3::new(-5.5, 0.6, 4.5),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        spawn_marker(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &format!("Waypoint {index}"),
+            Color::srgb(0.90, 0.40, 0.78),
+            point,
+        );
+    }
+
+    let path_agent = spawn_agent(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        "Path Agent",
+        Color::srgb(0.20, 0.82, 0.56),
+        Transform::from_xyz(-5.5, 0.6, -4.5),
+    );
+    commands.entity(path_agent).insert((
+        PathAgent,
+        SteeringAgent::new(SteeringPlane::XZ)
+            .with_max_speed(7.0)
+            .with_max_acceleration(16.0),
+        SteeringAutoApply::default(),
+        PathFollowing::new(
+            SteeringPath::new([
+                Vec3::new(-5.5, 0.6, -4.5),
+                Vec3::new(5.5, 0.6, -4.5),
+                Vec3::new(5.5, 0.6, 4.5),
+                Vec3::new(-5.5, 0.6, 4.5),
+            ])
+            .looped()
+            .with_lookahead_distance(2.6),
+        ),
+    ));
+
+    let avoidance_agent = spawn_agent(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        "Avoidance Agent",
+        Color::srgb(0.18, 0.76, 0.94),
+        Transform::from_xyz(-8.0, 0.6, 0.0),
+    );
+    commands.entity(avoidance_agent).insert((
+        AvoidanceAgent,
+        SteeringAgent::new(SteeringPlane::XZ)
+            .with_max_speed(6.0)
+            .with_max_acceleration(13.0),
+        SteeringAutoApply::default(),
+        Seek::new(SteeringTarget::Point(avoidance_goal)),
+        ObstacleAvoidance {
+            min_lookahead: 3.0,
+            max_lookahead: 7.5,
+            probe_radius: 0.38,
+            lateral_weight: 1.7,
+            braking_weight: 0.35,
+            ..default()
+        },
+    ));
+
+    let orbit_target = commands
+        .spawn((
+            Name::new("Orbit Target Driver"),
+            OrbitTarget,
+            SteeringTrackedVelocity,
+            SteeringAutoApply {
+                apply_translation: false,
+                apply_facing: false,
+            },
+            Transform::from_xyz(0.0, 0.6, 5.2),
+            GlobalTransform::default(),
+            OrbitMotion {
+                center: Vec3::new(0.0, 0.6, 0.0),
+                radius: 5.2,
+                speed: 0.85,
+            },
+        ))
+        .id();
+
+    let pursue_agent = spawn_agent(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        "Pursuit Agent",
+        Color::srgb(0.38, 0.64, 0.96),
+        Transform::from_xyz(-6.5, 0.6, -6.0),
+    );
+    commands.entity(pursue_agent).insert((
+        PursuitAgent,
+        SteeringAgent::new(SteeringPlane::XZ)
+            .with_max_speed(6.4)
+            .with_max_acceleration(14.0),
+        SteeringAutoApply::default(),
+        Pursue::new(SteeringTarget::Entity(orbit_target)),
+        ObstacleAvoidance::default(),
+    ));
+
+    let wander_agent = spawn_agent(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        "Wander Agent",
+        Color::srgb(0.88, 0.54, 0.20),
+        Transform::from_xyz(0.0, 0.6, 7.0),
+    );
+    commands.entity(wander_agent).insert((
+        WanderAgent,
+        SteeringAgent::new(SteeringPlane::XZ)
+            .with_max_speed(4.6)
+            .with_max_acceleration(9.0),
+        SteeringAutoApply::default(),
+        Wander {
+            seed: 11,
+            radius: 2.0,
+            distance: 2.8,
+            jitter_radians_per_second: 1.35,
+            ..default()
+        },
+    ));
+
+    let arrive_agent = spawn_agent(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        "Arrive Agent",
+        Color::srgb(0.76, 0.30, 0.86),
+        Transform::from_xyz(8.0, 0.6, 6.0),
+    );
+    let mut arrive = Arrive::new(SteeringTarget::Point(Vec3::new(2.5, 0.6, 7.0)));
+    arrive.slowing_radius = 3.2;
+    commands.entity(arrive_agent).insert((
+        SteeringAgent::new(SteeringPlane::XZ)
+            .with_max_speed(5.0)
+            .with_max_acceleration(12.0),
+        SteeringAutoApply::default(),
+        SteeringKinematics {
+            linear_velocity: Vec3::new(-1.0, 0.0, 0.0),
+        },
+        arrive,
+    ));
+}
+
+fn spawn_agent(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    name: &str,
+    color: Color,
+    transform: Transform,
+) -> Entity {
+    commands
+        .spawn((
+            Name::new(name.to_owned()),
+            Mesh3d(meshes.add(Capsule3d::new(0.35, 0.7))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: color,
+                perceptual_roughness: 0.7,
+                ..default()
+            })),
+            transform,
+        ))
+        .id()
+}
+
+fn spawn_marker(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    name: &str,
+    color: Color,
+    position: Vec3,
+) -> Entity {
+    commands
+        .spawn((
+            Name::new(name.to_owned()),
+            Mesh3d(meshes.add(Sphere::new(0.22))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: color,
+                emissive: color.to_linear() * 0.4,
+                ..default()
+            })),
+            Transform::from_translation(position),
+        ))
+        .id()
+}
+
+fn spawn_obstacle(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    name: &str,
+    size: Vec3,
+    transform: Transform,
+    main: bool,
+) -> Entity {
+    let mut entity = commands.spawn((
+        Name::new(name.to_owned()),
+        SteeringObstacle::aabb(size * 0.5),
+        Mesh3d(meshes.add(Cuboid::new(size.x, size.y, size.z))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.40, 0.19, 0.18),
+            perceptual_roughness: 0.85,
+            ..default()
+        })),
+        transform,
+    ));
+    if main {
+        entity.insert(MainObstacle);
+    }
+    entity.id()
+}
+
+fn orbit_targets(
+    time: Res<Time>,
+    mut targets: Query<(&OrbitMotion, &mut Transform), With<OrbitTarget>>,
+) {
+    for (motion, mut transform) in &mut targets {
+        let angle = time.elapsed_secs() * motion.speed;
+        transform.translation = motion.center
+            + Vec3::new(
+                angle.cos() * motion.radius,
+                0.0,
+                angle.sin() * motion.radius,
+            );
+    }
+}
+
+fn toggle_debug(keyboard: Res<ButtonInput<KeyCode>>, mut settings: ResMut<SteeringDebugSettings>) {
+    if keyboard.just_pressed(KeyCode::Tab) {
+        settings.enabled = !settings.enabled;
+    }
+}
+
+fn update_lab_diagnostics(
+    mut diagnostics: ResMut<LabDiagnostics>,
+    outputs: Query<&steering::SteeringOutput, With<SteeringAgent>>,
+    path_agent: Query<&PathFollowingState, With<PathAgent>>,
+    avoidance_agent: Query<&Transform, With<AvoidanceAgent>>,
+    pursuit_agent: Query<&Transform, With<PursuitAgent>>,
+    pursuit_target: Query<&Transform, With<OrbitTarget>>,
+    wander_agent: Query<&SteeringKinematics, With<WanderAgent>>,
+    main_obstacle: Query<(&Transform, &SteeringObstacle), With<MainObstacle>>,
+) {
+    diagnostics.active_agents = outputs
+        .iter()
+        .filter(|output| {
+            output.desired_velocity.length() > 0.05 || output.linear_acceleration.length() > 0.05
+        })
+        .count();
+
+    if let Ok(path_state) = path_agent.single() {
+        diagnostics.path_waypoint = path_state.current_waypoint;
+        diagnostics.path_cycles = path_state.completed_cycles;
+    }
+
+    if let (Ok(transform), Ok((obstacle_transform, obstacle))) =
+        (avoidance_agent.single(), main_obstacle.single())
+    {
+        diagnostics.avoidance_position = transform.translation;
+        diagnostics.avoidance_passed_obstacle =
+            transform.translation.x > obstacle_transform.translation.x;
+        if let SteeringObstacleShape::Aabb { half_extents } = obstacle.shape {
+            let clearance = aabb_clearance(
+                transform.translation,
+                obstacle_transform.translation,
+                half_extents,
+                0.45,
+            );
+            diagnostics.avoidance_min_clearance =
+                diagnostics.avoidance_min_clearance.min(clearance);
+        }
+    }
+
+    if let (Ok(pursuer), Ok(target)) = (pursuit_agent.single(), pursuit_target.single()) {
+        diagnostics.pursuit_distance = pursuer.translation.distance(target.translation);
+    }
+
+    if let Ok(wander_velocity) = wander_agent.single() {
+        diagnostics.wander_speed = wander_velocity.linear_velocity.length();
+    }
+}
+
+fn update_overlay(
+    diagnostics: Res<LabDiagnostics>,
+    mut overlay: Single<&mut Text, With<OverlayText>>,
+    debug: Res<SteeringDebugSettings>,
+) {
+    if !diagnostics.is_changed() && !debug.is_changed() {
+        return;
+    }
+
+    **overlay = format!(
+        "steering lab\n\
+active agents: {}\n\
+path waypoint/cycles: {}/{}\n\
+avoidance clearance min: {:.2}\n\
+avoidance passed obstacle: {}\n\
+pursuit distance: {:.2}\n\
+wander speed: {:.2}\n\
+debug gizmos: {} (Tab)",
+        diagnostics.active_agents,
+        diagnostics.path_waypoint,
+        diagnostics.path_cycles,
+        diagnostics.avoidance_min_clearance,
+        diagnostics.avoidance_passed_obstacle,
+        diagnostics.pursuit_distance,
+        diagnostics.wander_speed,
+        if debug.enabled { "on" } else { "off" },
+    )
+    .into();
+}
+
+fn aabb_clearance(position: Vec3, center: Vec3, half_extents: Vec3, radius: f32) -> f32 {
+    let local = position - center;
+    let delta = (local.abs() - half_extents).max(Vec3::ZERO);
+    delta.length() - radius
+}

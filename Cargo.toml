@@ -1,0 +1,18 @@
+[package]
+name = "saddle-ai-steering"
+version = "0.1.0"
+edition = "2024"
+publish = false
+repository = "https://github.com/julien-blanchon/saddle-ai-steering"
+license = "MIT-0"
+description = "Reusable steering behaviors for locomotion intent in Bevy"
+
+[dependencies]
+bevy = "0.18"
+
+[workspace]
+
+[lints.clippy]
+too_many_arguments = "allow"
+type_complexity = "allow"
+nonstandard_macro_braces = "warn"

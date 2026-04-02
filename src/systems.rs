@@ -1,0 +1,555 @@
+use crate::{
+    behaviors,
+    components::*,
+    math::{self, LinearIntent},
+    resources::{SteeringRuntimeState, SteeringStats},
+};
+use bevy::prelude::*;
+
+#[derive(Component, Default)]
+pub(crate) struct SteeringHistory {
+    pub previous_translation: Option<Vec3>,
+}
+
+pub(crate) fn activate_runtime(mut runtime: ResMut<SteeringRuntimeState>) {
+    runtime.active = true;
+}
+
+pub(crate) fn deactivate_runtime(
+    mut runtime: ResMut<SteeringRuntimeState>,
+    mut outputs: Query<(&mut SteeringOutput, &mut SteeringDiagnostics)>,
+) {
+    runtime.active = false;
+    for (mut output, mut diagnostics) in &mut outputs {
+        *output = SteeringOutput::default();
+        *diagnostics = SteeringDiagnostics::default();
+    }
+}
+
+pub(crate) fn runtime_is_active(runtime: Res<SteeringRuntimeState>) -> bool {
+    runtime.active
+}
+
+pub(crate) fn setup_steering_entities(
+    mut commands: Commands,
+    agents_missing_helpers: Query<Entity, (With<SteeringAgent>, Without<SteeringKinematics>)>,
+    agents_missing_output: Query<Entity, (With<SteeringAgent>, Without<SteeringOutput>)>,
+    agents_missing_diagnostics: Query<Entity, (With<SteeringAgent>, Without<SteeringDiagnostics>)>,
+    agents_missing_history: Query<Entity, (With<SteeringAgent>, Without<SteeringHistory>)>,
+    tracked_missing_helpers: Query<
+        Entity,
+        (With<SteeringTrackedVelocity>, Without<SteeringKinematics>),
+    >,
+    tracked_missing_history: Query<
+        Entity,
+        (With<SteeringTrackedVelocity>, Without<SteeringHistory>),
+    >,
+    wander_missing_state: Query<(Entity, &Wander), (With<SteeringAgent>, Without<WanderState>)>,
+    path_missing_state: Query<
+        Entity,
+        (
+            With<SteeringAgent>,
+            With<PathFollowing>,
+            Without<PathFollowingState>,
+        ),
+    >,
+) {
+    for entity in &agents_missing_helpers {
+        commands
+            .entity(entity)
+            .insert(SteeringKinematics::default());
+    }
+    for entity in &agents_missing_output {
+        commands.entity(entity).insert(SteeringOutput::default());
+    }
+    for entity in &agents_missing_diagnostics {
+        commands
+            .entity(entity)
+            .insert(SteeringDiagnostics::default());
+    }
+    for entity in &agents_missing_history {
+        commands.entity(entity).insert(SteeringHistory::default());
+    }
+    for entity in &tracked_missing_helpers {
+        commands
+            .entity(entity)
+            .insert(SteeringKinematics::default());
+    }
+    for entity in &tracked_missing_history {
+        commands.entity(entity).insert(SteeringHistory::default());
+    }
+    for (entity, wander) in &wander_missing_state {
+        commands
+            .entity(entity)
+            .insert(WanderState::from_seed(wander.seed.max(1)));
+    }
+    for entity in &path_missing_state {
+        commands.entity(entity).insert(PathFollowingState {
+            direction: 1,
+            ..default()
+        });
+    }
+}
+
+pub(crate) fn refresh_tracked_kinematics(
+    time: Res<Time>,
+    mut tracked: Query<
+        (
+            &GlobalTransform,
+            Option<&SteeringAgent>,
+            Option<&SteeringTrackedVelocity>,
+            &mut SteeringKinematics,
+            &mut SteeringHistory,
+        ),
+        Or<(With<SteeringAgent>, With<SteeringTrackedVelocity>)>,
+    >,
+) {
+    let delta_seconds = time.delta_secs().max(STEERING_MIN_DT);
+    for (global_transform, agent, explicit_tracker, mut kinematics, mut history) in &mut tracked {
+        let current_translation = global_transform.translation();
+        let should_track = explicit_tracker.is_some()
+            || agent.is_some_and(|agent| {
+                matches!(
+                    agent.velocity_source,
+                    SteeringVelocitySource::TransformDelta
+                )
+            });
+
+        if should_track {
+            if let Some(previous_translation) = history.previous_translation {
+                kinematics.linear_velocity =
+                    (current_translation - previous_translation) / delta_seconds;
+            } else {
+                kinematics.linear_velocity = Vec3::ZERO;
+            }
+        }
+        history.previous_translation = Some(current_translation);
+    }
+}
+
+const STEERING_MIN_DT: f32 = 1.0 / 480.0;
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn evaluate_agents(
+    time: Res<Time>,
+    mut stats: ResMut<SteeringStats>,
+    agents: Query<(
+        Entity,
+        &SteeringAgent,
+        &Transform,
+        &GlobalTransform,
+        &SteeringKinematics,
+        Option<&Seek>,
+        Option<&Flee>,
+        Option<&Arrive>,
+        Option<&Pursue>,
+        Option<&Evade>,
+        Option<&Wander>,
+        Option<&ObstacleAvoidance>,
+        Option<&PathFollowing>,
+    )>,
+    mut wander_states: Query<&mut WanderState>,
+    mut path_states: Query<&mut PathFollowingState>,
+    mut outputs: Query<(&mut SteeringOutput, &mut SteeringDiagnostics)>,
+    targets: Query<(&GlobalTransform, Option<&SteeringKinematics>)>,
+    obstacles: Query<(Entity, &GlobalTransform, &SteeringObstacle)>,
+) {
+    let delta_seconds = time.delta_secs().max(STEERING_MIN_DT);
+    stats.evaluated_agents = 0;
+    stats.active_behaviors = 0;
+    stats.obstacle_tests = 0;
+    stats.obstacle_hits = 0;
+
+    for (
+        entity,
+        agent,
+        transform,
+        global_transform,
+        kinematics,
+        seek,
+        flee,
+        arrive,
+        pursue,
+        evade,
+        wander,
+        obstacle_avoidance,
+        path_following,
+    ) in &agents
+    {
+        stats.evaluated_agents += 1;
+
+        let Ok((mut output, mut diagnostics)) = outputs.get_mut(entity) else {
+            continue;
+        };
+        let position = global_transform.translation();
+        let current_velocity = agent.plane.project_vector(kinematics.linear_velocity);
+        let fallback_forward = agent.plane.forward_from_transform(transform);
+        let mut contributions = Vec::new();
+        let mut primary_target = None;
+        let mut path_target = None;
+        let mut wander_circle_center = None;
+        let mut wander_target = None;
+        let mut probe_end = None;
+        let mut hit_point = None;
+        let mut hit_normal = None;
+        let mut avoidance_obstacle = None;
+
+        if let Some(seek) = seek {
+            if seek.tuning.enabled {
+                if let Some(target) = resolve_target(seek.target, position, &targets, agent.plane) {
+                    primary_target = Some(target.position);
+                    let intent = behaviors::seek::evaluate(
+                        position,
+                        current_velocity,
+                        target.position,
+                        agent.plane,
+                        agent.max_speed,
+                        agent.max_acceleration,
+                    );
+                    push_contribution(
+                        &mut contributions,
+                        SteeringBehaviorKind::Seek,
+                        seek.tuning,
+                        intent,
+                    );
+                }
+            }
+        }
+
+        if let Some(flee) = flee {
+            if flee.tuning.enabled {
+                if let Some(target) = resolve_target(flee.target, position, &targets, agent.plane) {
+                    primary_target = Some(target.position);
+                    let intent = behaviors::flee::evaluate(
+                        position,
+                        current_velocity,
+                        target.position,
+                        agent.plane,
+                        agent.max_speed,
+                        agent.max_acceleration,
+                        flee.panic_distance,
+                    );
+                    push_contribution(
+                        &mut contributions,
+                        SteeringBehaviorKind::Flee,
+                        flee.tuning,
+                        intent,
+                    );
+                }
+            }
+        }
+
+        if let Some(arrive) = arrive {
+            if arrive.tuning.enabled {
+                if let Some(target) = resolve_target(arrive.target, position, &targets, agent.plane)
+                {
+                    primary_target = Some(target.position);
+                    let intent = behaviors::arrive::evaluate(
+                        position,
+                        current_velocity,
+                        target.position,
+                        agent.plane,
+                        agent.max_speed,
+                        agent.max_acceleration,
+                        arrive.slowing_radius,
+                        arrive.arrival_tolerance,
+                        arrive.speed_curve_exponent,
+                    );
+                    push_contribution(
+                        &mut contributions,
+                        SteeringBehaviorKind::Arrive,
+                        arrive.tuning,
+                        intent,
+                    );
+                }
+            }
+        }
+
+        if let Some(pursue) = pursue {
+            if pursue.tuning.enabled {
+                if let Some(target) = resolve_target(pursue.target, position, &targets, agent.plane)
+                {
+                    let (intent, predicted) = behaviors::pursue::evaluate(
+                        position,
+                        current_velocity,
+                        target.position,
+                        target.velocity,
+                        agent.plane,
+                        agent.max_speed,
+                        agent.max_acceleration,
+                        pursue.lead_scale,
+                        pursue.max_prediction_time,
+                    );
+                    primary_target = Some(predicted);
+                    push_contribution(
+                        &mut contributions,
+                        SteeringBehaviorKind::Pursue,
+                        pursue.tuning,
+                        intent,
+                    );
+                }
+            }
+        }
+
+        if let Some(evade) = evade {
+            if evade.tuning.enabled {
+                if let Some(target) = resolve_target(evade.target, position, &targets, agent.plane)
+                {
+                    let (intent, predicted) = behaviors::evade::evaluate(
+                        position,
+                        current_velocity,
+                        target.position,
+                        target.velocity,
+                        agent.plane,
+                        agent.max_speed,
+                        agent.max_acceleration,
+                        evade.lead_scale,
+                        evade.max_prediction_time,
+                        evade.panic_distance,
+                    );
+                    primary_target = Some(predicted);
+                    push_contribution(
+                        &mut contributions,
+                        SteeringBehaviorKind::Evade,
+                        evade.tuning,
+                        intent,
+                    );
+                }
+            }
+        }
+
+        if let Some(wander) = wander {
+            if wander.tuning.enabled {
+                let Ok(mut wander_state) = wander_states.get_mut(entity) else {
+                    continue;
+                };
+                let (intent, debug) = behaviors::wander::evaluate(
+                    position,
+                    current_velocity,
+                    fallback_forward,
+                    agent.plane,
+                    agent.max_speed,
+                    agent.max_acceleration,
+                    wander,
+                    &mut wander_state,
+                    delta_seconds,
+                );
+                wander_circle_center = Some(debug.circle_center);
+                wander_target = Some(debug.target_point);
+                push_contribution(
+                    &mut contributions,
+                    SteeringBehaviorKind::Wander,
+                    wander.tuning,
+                    intent,
+                );
+            }
+        }
+
+        if let Some(path_following) = path_following {
+            if path_following.tuning.enabled {
+                let Ok(mut path_state) = path_states.get_mut(entity) else {
+                    continue;
+                };
+                let (intent, debug) = behaviors::path_following::evaluate(
+                    position,
+                    current_velocity,
+                    agent.plane,
+                    agent.max_speed,
+                    agent.max_acceleration,
+                    path_following,
+                    &mut path_state,
+                );
+                path_target = debug.lookahead_point;
+                push_contribution(
+                    &mut contributions,
+                    SteeringBehaviorKind::PathFollowing,
+                    path_following.tuning,
+                    intent,
+                );
+            }
+        }
+
+        let mut preview_contributions = contributions.clone();
+        let pre_avoidance_velocity = math::compose_contributions(
+            agent.composition,
+            agent.max_acceleration,
+            &mut preview_contributions,
+        )
+        .desired_velocity;
+
+        if let Some(avoidance) = obstacle_avoidance {
+            if avoidance.tuning.enabled {
+                let obstacle_iter = obstacles
+                    .iter()
+                    .map(|(entity, transform, obstacle)| (entity, transform.affine(), obstacle));
+                if let Some((intent, debug)) = behaviors::obstacle_avoidance::evaluate(
+                    position,
+                    current_velocity,
+                    pre_avoidance_velocity,
+                    fallback_forward,
+                    agent.plane,
+                    agent,
+                    avoidance,
+                    obstacle_iter,
+                ) {
+                    probe_end = Some(debug.probe_end);
+                    hit_point = debug.hit_point;
+                    hit_normal = debug.avoidance_direction;
+                    avoidance_obstacle = debug.obstacle;
+                    stats.obstacle_tests += debug.tests;
+                    stats.obstacle_hits += 1;
+                    push_contribution(
+                        &mut contributions,
+                        SteeringBehaviorKind::ObstacleAvoidance,
+                        avoidance.tuning,
+                        intent,
+                    );
+                }
+            }
+        }
+
+        let mut composed = math::compose_contributions(
+            agent.composition,
+            agent.max_acceleration,
+            &mut contributions,
+        );
+
+        let active_behavior_count = contributions
+            .iter()
+            .filter(|contribution| contribution.applied_acceleration.length_squared() > 0.0)
+            .count();
+        stats.active_behaviors += active_behavior_count;
+
+        if active_behavior_count == 0 && current_velocity.length_squared() > 0.0 {
+            let brake =
+                math::braking_intent(current_velocity, agent.plane, agent.braking_acceleration);
+            push_contribution(
+                &mut contributions,
+                SteeringBehaviorKind::Brake,
+                BehaviorTuning::new(1.0, u8::MAX),
+                brake,
+            );
+            composed = math::compose_contributions(
+                agent.composition,
+                agent.max_acceleration,
+                &mut contributions,
+            );
+        }
+
+        *output = SteeringOutput {
+            linear_acceleration: agent.plane.project_vector(composed.linear_acceleration),
+            desired_velocity: agent.plane.project_vector(math::clamp_magnitude(
+                composed.desired_velocity,
+                agent.max_speed,
+            )),
+            desired_facing: math::desired_facing(
+                agent,
+                composed.desired_velocity,
+                current_velocity,
+                fallback_forward,
+            ),
+        };
+
+        *diagnostics = SteeringDiagnostics {
+            dominant_behavior: math::dominant_behavior(&contributions),
+            contributions,
+            primary_target,
+            path_target,
+            wander_circle_center,
+            wander_target,
+            probe_end,
+            avoidance_hit_point: hit_point,
+            avoidance_normal: hit_normal,
+            avoidance_obstacle,
+            pre_avoidance_velocity,
+        };
+    }
+}
+
+pub(crate) fn apply_auto_steering(
+    time: Res<Time>,
+    mut agents: Query<(
+        &SteeringAgent,
+        &SteeringAutoApply,
+        &SteeringOutput,
+        &mut SteeringKinematics,
+        &mut Transform,
+    )>,
+) {
+    let delta_seconds = time.delta_secs().max(STEERING_MIN_DT);
+    for (agent, auto_apply, output, mut kinematics, mut transform) in &mut agents {
+        let new_velocity = agent.plane.project_vector(
+            kinematics.linear_velocity + output.linear_acceleration * delta_seconds,
+        );
+        kinematics.linear_velocity = math::clamp_magnitude(new_velocity, agent.max_speed);
+
+        if auto_apply.apply_translation {
+            let translated = transform.translation
+                + agent.plane.project_vector(kinematics.linear_velocity) * delta_seconds;
+            transform.translation = agent
+                .plane
+                .clamp_translation(transform.translation, translated);
+        }
+
+        if auto_apply.apply_facing {
+            let Some(desired_facing) = output.desired_facing else {
+                continue;
+            };
+            let Some(target_rotation) = math::target_rotation(agent.plane, desired_facing) else {
+                continue;
+            };
+            let interpolation =
+                (agent.alignment.turn_speed_radians * delta_seconds).clamp(0.0, 1.0);
+            transform.rotation = transform.rotation.slerp(target_rotation, interpolation);
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct ResolvedTarget {
+    position: Vec3,
+    velocity: Vec3,
+}
+
+fn resolve_target(
+    target: SteeringTarget,
+    origin: Vec3,
+    targets: &Query<(&GlobalTransform, Option<&SteeringKinematics>)>,
+    plane: SteeringPlane,
+) -> Option<ResolvedTarget> {
+    match target {
+        SteeringTarget::Point(point) => Some(ResolvedTarget {
+            position: plane.align_point(origin, point),
+            velocity: Vec3::ZERO,
+        }),
+        SteeringTarget::Entity(entity) => {
+            let (transform, kinematics) = targets.get(entity).ok()?;
+            Some(ResolvedTarget {
+                position: plane.align_point(origin, transform.translation()),
+                velocity: plane
+                    .project_vector(kinematics.copied().unwrap_or_default().linear_velocity),
+            })
+        }
+    }
+}
+
+fn push_contribution(
+    contributions: &mut Vec<SteeringContribution>,
+    behavior: SteeringBehaviorKind,
+    tuning: BehaviorTuning,
+    intent: LinearIntent,
+) {
+    if !tuning.enabled || intent.is_zero() {
+        return;
+    }
+
+    contributions.push(SteeringContribution {
+        behavior,
+        priority: tuning.priority,
+        weight: tuning.weight.max(0.0),
+        requested_acceleration: intent.linear_acceleration,
+        applied_acceleration: Vec3::ZERO,
+        desired_velocity: intent.desired_velocity,
+        suppressed: false,
+    });
+}

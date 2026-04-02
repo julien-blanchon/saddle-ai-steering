@@ -1,0 +1,22 @@
+[workspace]
+members = [
+    "support",
+    "basic",
+    "arrive",
+    "wander",
+    "obstacle_avoidance",
+    "path_following",
+    "blended",
+    "kinematic_2d",
+    "lab",
+]
+resolver = "3"
+
+[workspace.dependencies]
+bevy = "0.18"
+saddle-ai-steering = { path = ".." }
+
+[workspace.lints.clippy]
+too_many_arguments = "allow"
+type_complexity = "allow"
+nonstandard_macro_braces = "warn"
