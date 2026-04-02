@@ -15,7 +15,7 @@ resolver = "3"
 [workspace.dependencies]
 bevy = "0.18"
 saddle-ai-steering = { path = ".." }
-steering = { path = ".." }
+steering = { path = "..", package = "saddle-ai-steering" }
 
 [workspace.lints.clippy]
 too_many_arguments = "allow"

@@ -4,7 +4,7 @@ mod e2e;
 mod scenarios;
 
 use bevy::prelude::*;
-#[cfg(feature = "dev")]
+#[cfg(all(feature = "dev", not(target_arch = "wasm32")))]
 use bevy_brp_extras::BrpExtrasPlugin;
 use steering::{
     Arrive, ObstacleAvoidance, PathFollowing, PathFollowingState, Pursue, Seek, SteeringAgent,
@@ -88,7 +88,7 @@ fn main() {
         }),
         ..default()
     }));
-    #[cfg(feature = "dev")]
+    #[cfg(all(feature = "dev", not(target_arch = "wasm32")))]
     app.add_plugins(BrpExtrasPlugin::with_port(lab_brp_port()));
     #[cfg(feature = "e2e")]
     app.add_plugins(e2e::SteeringLabE2EPlugin);
