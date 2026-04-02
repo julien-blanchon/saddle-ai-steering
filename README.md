@@ -20,7 +20,7 @@ steering = { path = "shared/ai/steering" }
 
 ```rust,no_run
 use bevy::prelude::*;
-use steering::{
+use saddle_ai_steering::{
     Seek, SteeringAgent, SteeringAutoApply, SteeringDebugSettings, SteeringPath, SteeringPlane,
     SteeringPlugin, SteeringTarget,
 };
