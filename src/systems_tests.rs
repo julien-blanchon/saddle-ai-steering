@@ -174,6 +174,100 @@ fn empty_world_does_not_panic() {
     app.update();
 }
 
+#[test]
+fn flocking_aligns_with_neighbor_heading() {
+    let mut app = make_test_app();
+    app.add_plugins(SteeringPlugin::default());
+
+    app.world_mut().spawn((
+        SteeringAgent::default(),
+        SteeringKinematics {
+            linear_velocity: Vec3::new(0.0, 0.0, 2.0),
+        },
+        Transform::from_xyz(-1.0, 0.0, 0.0),
+        GlobalTransform::from(Transform::from_xyz(-1.0, 0.0, 0.0)),
+    ));
+    app.world_mut().spawn((
+        SteeringAgent::default(),
+        SteeringKinematics {
+            linear_velocity: Vec3::new(0.0, 0.0, 2.0),
+        },
+        Transform::from_xyz(1.0, 0.0, 0.0),
+        GlobalTransform::from(Transform::from_xyz(1.0, 0.0, 0.0)),
+    ));
+
+    let entity = app
+        .world_mut()
+        .spawn((
+            SteeringAgent::default(),
+            Flocking {
+                separation_weight: 0.0,
+                cohesion_weight: 0.0,
+                alignment_weight: 1.5,
+                ..default()
+            },
+            Transform::default(),
+            GlobalTransform::default(),
+        ))
+        .id();
+
+    app.update();
+
+    let output = app
+        .world()
+        .entity(entity)
+        .get::<SteeringOutput>()
+        .expect("flocking output should exist");
+    let diagnostics = app
+        .world()
+        .entity(entity)
+        .get::<SteeringDiagnostics>()
+        .expect("flocking diagnostics should exist");
+
+    assert!(output.desired_velocity.z > 0.5);
+    assert_eq!(diagnostics.flock_neighbor_count, 2);
+}
+
+#[test]
+fn reciprocal_avoidance_deflects_head_on_agents() {
+    let mut app = make_test_app();
+    app.add_plugins(SteeringPlugin::default());
+
+    let left = app
+        .world_mut()
+        .spawn((
+            SteeringAgent::default(),
+            Seek::new(SteeringTarget::point(4.0, 0.0, 0.0)),
+            ReciprocalAvoidance::default(),
+            Transform::default(),
+            GlobalTransform::default(),
+        ))
+        .id();
+    app.world_mut().spawn((
+        SteeringAgent::default(),
+        Seek::new(SteeringTarget::point(-4.0, 0.0, 0.0)),
+        ReciprocalAvoidance::default(),
+        Transform::from_xyz(1.2, 0.0, 0.0),
+        GlobalTransform::from(Transform::from_xyz(1.2, 0.0, 0.0)),
+    ));
+
+    app.update();
+
+    let output = app
+        .world()
+        .entity(left)
+        .get::<SteeringOutput>()
+        .expect("reciprocal avoidance output should exist");
+    let diagnostics = app
+        .world()
+        .entity(left)
+        .get::<SteeringDiagnostics>()
+        .expect("reciprocal avoidance diagnostics should exist");
+
+    assert!(diagnostics.crowd_neighbor_count > 0);
+    assert!(output.desired_velocity.z.abs() > 0.1);
+}
+
 fn record_gather(mut log: ResMut<OrderLog>) {
     log.0.push("gather");
 }

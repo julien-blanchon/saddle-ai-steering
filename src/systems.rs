@@ -145,7 +145,9 @@ pub(crate) fn evaluate_agents(
         Option<&Pursue>,
         Option<&Evade>,
         Option<&Wander>,
+        Option<&Flocking>,
         Option<&ObstacleAvoidance>,
+        Option<&ReciprocalAvoidance>,
         Option<&PathFollowing>,
     )>,
     mut wander_states: Query<&mut WanderState>,
@@ -159,6 +161,39 @@ pub(crate) fn evaluate_agents(
     stats.active_behaviors = 0;
     stats.obstacle_tests = 0;
     stats.obstacle_hits = 0;
+    stats.flock_neighbors = 0;
+    stats.crowd_neighbors = 0;
+    stats.crowd_conflicts = 0;
+
+    let crowd_neighbors = agents
+        .iter()
+        .map(
+            |(
+                entity,
+                agent,
+                _transform,
+                global_transform,
+                kinematics,
+                _seek,
+                _flee,
+                _arrive,
+                _pursue,
+                _evade,
+                _wander,
+                _flocking,
+                _obstacle_avoidance,
+                _reciprocal_avoidance,
+                _path_following,
+            )| CrowdNeighbor {
+                entity,
+                position: global_transform.translation(),
+                velocity: kinematics.linear_velocity,
+                radius: agent.body_radius,
+                layers: agent.crowd_layers,
+                plane: agent.plane,
+            },
+        )
+        .collect::<Vec<_>>();
 
     for (
         entity,
@@ -172,7 +207,9 @@ pub(crate) fn evaluate_agents(
         pursue,
         evade,
         wander,
+        flocking,
         obstacle_avoidance,
+        reciprocal_avoidance,
         path_following,
     ) in &agents
     {
@@ -189,10 +226,15 @@ pub(crate) fn evaluate_agents(
         let mut path_target = None;
         let mut wander_circle_center = None;
         let mut wander_target = None;
+        let mut flock_center = None;
+        let mut flock_heading = None;
+        let mut flock_neighbor_count = 0_usize;
         let mut probe_end = None;
         let mut hit_point = None;
         let mut hit_normal = None;
         let mut avoidance_obstacle = None;
+        let mut crowd_avoidance_velocity = None;
+        let mut crowd_neighbor_count = 0_usize;
 
         if let Some(seek) = seek {
             if seek.tuning.enabled {
@@ -345,6 +387,38 @@ pub(crate) fn evaluate_agents(
             }
         }
 
+        if let Some(flocking) = flocking {
+            if flocking.tuning.enabled {
+                let (intent, debug) = behaviors::flocking::evaluate(
+                    position,
+                    current_velocity,
+                    agent.plane,
+                    agent,
+                    flocking,
+                    crowd_neighbors
+                        .iter()
+                        .filter(|neighbor| {
+                            neighbor.entity != entity && neighbor.plane == agent.plane
+                        })
+                        .map(|neighbor| behaviors::flocking::NeighborSample {
+                            position: neighbor.position,
+                            velocity: neighbor.velocity,
+                            layers: neighbor.layers,
+                        }),
+                );
+                flock_center = debug.center;
+                flock_heading = debug.heading;
+                flock_neighbor_count = debug.neighbor_count;
+                stats.flock_neighbors += debug.neighbor_count;
+                push_contribution(
+                    &mut contributions,
+                    SteeringBehaviorKind::Flocking,
+                    flocking.tuning,
+                    intent,
+                );
+            }
+        }
+
         if let Some(path_following) = path_following {
             if path_following.tuning.enabled {
                 let Ok(mut path_state) = path_states.get_mut(entity) else {
@@ -377,6 +451,49 @@ pub(crate) fn evaluate_agents(
         )
         .desired_velocity;
 
+        if let Some(reciprocal_avoidance) = reciprocal_avoidance {
+            if reciprocal_avoidance.tuning.enabled {
+                if let Some((intent, debug)) = behaviors::reciprocal_avoidance::evaluate(
+                    position,
+                    current_velocity,
+                    pre_avoidance_velocity,
+                    agent.plane,
+                    agent,
+                    reciprocal_avoidance,
+                    crowd_neighbors
+                        .iter()
+                        .filter(|neighbor| {
+                            neighbor.entity != entity && neighbor.plane == agent.plane
+                        })
+                        .map(|neighbor| behaviors::reciprocal_avoidance::NeighborSample {
+                            position: neighbor.position,
+                            velocity: neighbor.velocity,
+                            radius: neighbor.radius,
+                            layers: neighbor.layers,
+                        }),
+                ) {
+                    crowd_avoidance_velocity = Some(debug.adjusted_velocity);
+                    crowd_neighbor_count = debug.neighbor_count;
+                    stats.crowd_neighbors += debug.neighbor_count;
+                    stats.crowd_conflicts += 1;
+                    push_contribution(
+                        &mut contributions,
+                        SteeringBehaviorKind::ReciprocalAvoidance,
+                        reciprocal_avoidance.tuning,
+                        intent,
+                    );
+                }
+            }
+        }
+
+        let mut obstacle_preview = contributions.clone();
+        let obstacle_preview_velocity = math::compose_contributions(
+            agent.composition,
+            agent.max_acceleration,
+            &mut obstacle_preview,
+        )
+        .desired_velocity;
+
         if let Some(avoidance) = obstacle_avoidance {
             if avoidance.tuning.enabled {
                 let obstacle_iter = obstacles
@@ -385,7 +502,7 @@ pub(crate) fn evaluate_agents(
                 if let Some((intent, debug)) = behaviors::obstacle_avoidance::evaluate(
                     position,
                     current_velocity,
-                    pre_avoidance_velocity,
+                    obstacle_preview_velocity,
                     fallback_forward,
                     agent.plane,
                     agent,
@@ -457,10 +574,15 @@ pub(crate) fn evaluate_agents(
             path_target,
             wander_circle_center,
             wander_target,
+            flock_center,
+            flock_heading,
+            flock_neighbor_count,
             probe_end,
             avoidance_hit_point: hit_point,
             avoidance_normal: hit_normal,
             avoidance_obstacle,
+            crowd_avoidance_velocity,
+            crowd_neighbor_count,
             pre_avoidance_velocity,
         };
     }
@@ -552,4 +674,14 @@ fn push_contribution(
         desired_velocity: intent.desired_velocity,
         suppressed: false,
     });
+}
+
+#[derive(Clone, Copy, Debug)]
+struct CrowdNeighbor {
+    entity: Entity,
+    position: Vec3,
+    velocity: Vec3,
+    radius: f32,
+    layers: SteeringLayerMask,
+    plane: SteeringPlane,
 }

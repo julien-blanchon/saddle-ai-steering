@@ -3,10 +3,23 @@ use steering_example_support as support;
 use bevy::prelude::*;
 use steering::{PathFollowing, SteeringAgent, SteeringAutoApply, SteeringPath, SteeringPlane};
 
+#[derive(Component)]
+struct PathAgent;
+
 fn main() {
     let mut app = App::new();
+    app.insert_resource(support::SteeringExamplePane {
+        max_speed: 5.0,
+        max_acceleration: 10.0,
+        path_lookahead: 2.4,
+        path_tolerance: 0.6,
+        slowing_radius: 3.0,
+        arrival_tolerance: 0.3,
+        ..default()
+    });
     support::configure_3d_app(&mut app, "steering: path following");
     app.add_systems(Startup, setup);
+    app.add_systems(Update, sync_pane);
     app.run();
 }
 
@@ -61,10 +74,28 @@ fn setup(
         Transform::from_xyz(-5.0, 0.6, -4.0),
     );
     commands.entity(agent).insert((
+        PathAgent,
         SteeringAgent::new(SteeringPlane::XZ)
             .with_max_speed(5.0)
             .with_max_acceleration(10.0),
         SteeringAutoApply::default(),
         PathFollowing::new(path),
     ));
+}
+
+fn sync_pane(
+    pane: Res<support::SteeringExamplePane>,
+    mut agents: Query<(&mut SteeringAgent, &mut PathFollowing), With<PathAgent>>,
+) {
+    if !pane.is_changed() {
+        return;
+    }
+
+    for (mut agent, mut path_following) in &mut agents {
+        support::apply_agent_tuning(&mut agent, &pane);
+        path_following.path.lookahead_distance = pane.path_lookahead;
+        path_following.path.waypoint_tolerance = pane.path_tolerance;
+        path_following.slowing_radius = pane.slowing_radius;
+        path_following.arrival_tolerance = pane.arrival_tolerance;
+    }
 }

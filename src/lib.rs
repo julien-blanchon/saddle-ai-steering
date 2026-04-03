@@ -8,12 +8,13 @@ mod resources;
 mod systems;
 
 pub use crate::components::{
-    Arrive, BehaviorTuning, Evade, Flee, ObstacleAvoidance, PathFollowing, PathFollowingState,
-    Pursue, Seek, SteeringAgent, SteeringAlignment, SteeringAutoApply, SteeringBehaviorKind,
-    SteeringComposition, SteeringContribution, SteeringDebugAgent, SteeringDiagnostics,
-    SteeringFacingMode, SteeringKinematics, SteeringLayerMask, SteeringObstacle,
-    SteeringObstacleShape, SteeringOutput, SteeringPath, SteeringPathMode, SteeringPlane,
-    SteeringTarget, SteeringTrackedVelocity, SteeringVelocitySource, Wander, WanderState,
+    Arrive, BehaviorTuning, Evade, Flee, Flocking, ObstacleAvoidance, PathFollowing,
+    PathFollowingState, Pursue, ReciprocalAvoidance, Seek, SteeringAgent, SteeringAlignment,
+    SteeringAutoApply, SteeringBehaviorKind, SteeringComposition, SteeringContribution,
+    SteeringDebugAgent, SteeringDiagnostics, SteeringFacingMode, SteeringKinematics,
+    SteeringLayerMask, SteeringObstacle, SteeringObstacleShape, SteeringOutput, SteeringPath,
+    SteeringPathMode, SteeringPlane, SteeringTarget, SteeringTrackedVelocity,
+    SteeringVelocitySource, Wander, WanderState,
 };
 pub use crate::debug::SteeringDebugGizmos;
 pub use crate::resources::{SteeringDebugSettings, SteeringStats};
@@ -79,10 +80,12 @@ impl Plugin for SteeringPlugin {
             .register_type::<BehaviorTuning>()
             .register_type::<Evade>()
             .register_type::<Flee>()
+            .register_type::<Flocking>()
             .register_type::<ObstacleAvoidance>()
             .register_type::<PathFollowing>()
             .register_type::<PathFollowingState>()
             .register_type::<Pursue>()
+            .register_type::<ReciprocalAvoidance>()
             .register_type::<Seek>()
             .register_type::<SteeringAgent>()
             .register_type::<SteeringAlignment>()

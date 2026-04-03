@@ -8,6 +8,7 @@ pub fn list_scenarios() -> Vec<&'static str> {
         "steering_smoke",
         "steering_path_following",
         "steering_avoidance",
+        "steering_flocking_crowd",
     ]
 }
 
@@ -17,6 +18,7 @@ pub fn scenario_by_name(name: &str) -> Option<Scenario> {
         "steering_smoke" => Some(steering_smoke()),
         "steering_path_following" => Some(steering_path_following()),
         "steering_avoidance" => Some(steering_avoidance()),
+        "steering_flocking_crowd" => Some(steering_flocking_crowd()),
         _ => None,
     }
 }
@@ -28,8 +30,8 @@ fn smoke_launch() -> Scenario {
         )
         .then(Action::WaitFrames(12))
         .then(assertions::resource_satisfies::<LabDiagnostics>(
-            "all five showcase agents are active at launch",
-            |diagnostics| diagnostics.active_agents == 5,
+            "the showcase plus crowd agents are active at launch",
+            |diagnostics| diagnostics.active_agents >= 8,
         ))
         .then(Action::Screenshot("overview".into()))
         .then(Action::WaitFrames(1))
@@ -100,5 +102,29 @@ fn steering_avoidance() -> Scenario {
         .then(Action::Screenshot("avoidance_clear".into()))
         .then(Action::WaitFrames(1))
         .then(assertions::log_summary("steering_avoidance"))
+        .build()
+}
+
+fn steering_flocking_crowd() -> Scenario {
+    Scenario::builder("steering_flocking_crowd")
+        .description(
+            "Let the crowd lanes converge, then verify flocking neighbors and reciprocal avoidance both activate while agents keep a positive separation.",
+        )
+        .then(Action::WaitFrames(20))
+        .then(Action::Screenshot("crowd_start".into()))
+        .then(Action::WaitFrames(1))
+        .then(Action::WaitFrames(180))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "crowd agents observed flock neighbors and avoidance conflicts",
+            |diagnostics| {
+                diagnostics.crowd_peak_flock_neighbors >= 1
+                    && diagnostics.crowd_peak_neighbors >= 1
+                    && diagnostics.crowd_conflict_frames > 0
+                    && diagnostics.crowd_min_separation > 0.2
+            },
+        ))
+        .then(Action::Screenshot("crowd_mid".into()))
+        .then(Action::WaitFrames(1))
+        .then(assertions::log_summary("steering_flocking_crowd"))
         .build()
 }

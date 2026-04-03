@@ -85,7 +85,9 @@ pub enum SteeringBehaviorKind {
     Pursue,
     Evade,
     Wander,
+    Flocking,
     ObstacleAvoidance,
+    ReciprocalAvoidance,
     PathFollowing,
     Brake,
 }
@@ -240,6 +242,7 @@ pub struct SteeringAgent {
     pub max_acceleration: f32,
     pub mass: f32,
     pub body_radius: f32,
+    pub crowd_layers: SteeringLayerMask,
     pub plane: SteeringPlane,
     pub composition: SteeringComposition,
     pub velocity_source: SteeringVelocitySource,
@@ -254,6 +257,7 @@ impl Default for SteeringAgent {
             max_acceleration: 12.0,
             mass: 1.0,
             body_radius: 0.45,
+            crowd_layers: SteeringLayerMask::ALL,
             plane: SteeringPlane::XZ,
             composition: SteeringComposition::PrioritizedAccumulation,
             velocity_source: SteeringVelocitySource::Kinematics,
@@ -275,6 +279,11 @@ impl SteeringAgent {
 
     pub fn with_max_acceleration(mut self, max_acceleration: f32) -> Self {
         self.max_acceleration = max_acceleration;
+        self
+    }
+
+    pub fn with_crowd_layers(mut self, crowd_layers: SteeringLayerMask) -> Self {
+        self.crowd_layers = crowd_layers;
         self
     }
 
@@ -353,10 +362,15 @@ pub struct SteeringDiagnostics {
     pub path_target: Option<Vec3>,
     pub wander_circle_center: Option<Vec3>,
     pub wander_target: Option<Vec3>,
+    pub flock_center: Option<Vec3>,
+    pub flock_heading: Option<Vec3>,
+    pub flock_neighbor_count: usize,
     pub probe_end: Option<Vec3>,
     pub avoidance_hit_point: Option<Vec3>,
     pub avoidance_normal: Option<Vec3>,
     pub avoidance_obstacle: Option<Entity>,
+    pub crowd_avoidance_velocity: Option<Vec3>,
+    pub crowd_neighbor_count: usize,
     pub pre_avoidance_velocity: Vec3,
 }
 
@@ -543,6 +557,36 @@ impl WanderState {
 
 #[derive(Component, Reflect, Clone, Debug, PartialEq)]
 #[reflect(Component)]
+pub struct Flocking {
+    pub separation_radius: f32,
+    pub alignment_radius: f32,
+    pub cohesion_radius: f32,
+    pub separation_weight: f32,
+    pub alignment_weight: f32,
+    pub cohesion_weight: f32,
+    pub max_neighbors: usize,
+    pub layers: SteeringLayerMask,
+    pub tuning: BehaviorTuning,
+}
+
+impl Default for Flocking {
+    fn default() -> Self {
+        Self {
+            separation_radius: 1.25,
+            alignment_radius: 3.0,
+            cohesion_radius: 4.0,
+            separation_weight: 1.6,
+            alignment_weight: 0.95,
+            cohesion_weight: 0.85,
+            max_neighbors: 12,
+            layers: SteeringLayerMask::ALL,
+            tuning: BehaviorTuning::new(1.0, 55),
+        }
+    }
+}
+
+#[derive(Component, Reflect, Clone, Debug, PartialEq)]
+#[reflect(Component)]
 pub struct ObstacleAvoidance {
     pub min_lookahead: f32,
     pub max_lookahead: f32,
@@ -563,6 +607,32 @@ impl Default for ObstacleAvoidance {
             lateral_weight: 1.0,
             layers: SteeringLayerMask::ALL,
             tuning: BehaviorTuning::new(1.0, 0),
+        }
+    }
+}
+
+#[derive(Component, Reflect, Clone, Debug, PartialEq)]
+#[reflect(Component)]
+pub struct ReciprocalAvoidance {
+    pub neighbor_distance: f32,
+    pub time_horizon: f32,
+    pub comfort_distance: f32,
+    pub side_bias: f32,
+    pub max_neighbors: usize,
+    pub layers: SteeringLayerMask,
+    pub tuning: BehaviorTuning,
+}
+
+impl Default for ReciprocalAvoidance {
+    fn default() -> Self {
+        Self {
+            neighbor_distance: 3.6,
+            time_horizon: 1.2,
+            comfort_distance: 0.15,
+            side_bias: 0.1,
+            max_neighbors: 8,
+            layers: SteeringLayerMask::ALL,
+            tuning: BehaviorTuning::new(1.0, 5),
         }
     }
 }

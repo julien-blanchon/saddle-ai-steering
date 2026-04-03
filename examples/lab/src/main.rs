@@ -6,13 +6,16 @@ mod scenarios;
 use bevy::prelude::*;
 #[cfg(all(feature = "dev", not(target_arch = "wasm32")))]
 use bevy_brp_extras::BrpExtrasPlugin;
+use saddle_pane::prelude::*;
 use steering::{
-    Arrive, ObstacleAvoidance, PathFollowing, PathFollowingState, Pursue, Seek, SteeringAgent,
-    SteeringAutoApply, SteeringDebugSettings, SteeringKinematics, SteeringObstacle,
-    SteeringObstacleShape, SteeringPath, SteeringPlane, SteeringTarget, SteeringTrackedVelocity,
-    Wander,
+    Arrive, Flocking, ObstacleAvoidance, PathFollowing, PathFollowingState, Pursue,
+    ReciprocalAvoidance, Seek, SteeringAgent, SteeringAutoApply, SteeringDebugSettings,
+    SteeringDiagnostics, SteeringKinematics, SteeringObstacle, SteeringObstacleShape,
+    SteeringPath, SteeringPlane, SteeringTarget, SteeringTrackedVelocity, Wander,
 };
+use steering_example_support as support;
 
+#[cfg(feature = "dev")]
 const DEFAULT_BRP_PORT: u16 = 15_736;
 
 #[derive(Component)]
@@ -29,6 +32,9 @@ struct WanderAgent;
 
 #[derive(Component)]
 struct OrbitTarget;
+
+#[derive(Component)]
+struct CrowdAgent;
 
 #[derive(Component)]
 struct MainObstacle;
@@ -54,6 +60,10 @@ pub struct LabDiagnostics {
     pub avoidance_passed_obstacle: bool,
     pub pursuit_distance: f32,
     pub wander_speed: f32,
+    pub crowd_peak_flock_neighbors: usize,
+    pub crowd_peak_neighbors: usize,
+    pub crowd_conflict_frames: u32,
+    pub crowd_min_separation: f32,
 }
 
 impl Default for LabDiagnostics {
@@ -67,6 +77,10 @@ impl Default for LabDiagnostics {
             avoidance_passed_obstacle: false,
             pursuit_distance: 0.0,
             wander_speed: 0.0,
+            crowd_peak_flock_neighbors: 0,
+            crowd_peak_neighbors: 0,
+            crowd_conflict_frames: 0,
+            crowd_min_separation: f32::MAX,
         }
     }
 }
@@ -76,6 +90,20 @@ fn main() {
     app.insert_resource(ClearColor(Color::srgb(0.04, 0.05, 0.07)));
     app.insert_resource(SteeringDebugSettings {
         enabled: true,
+        ..default()
+    });
+    app.insert_resource(support::SteeringExamplePane {
+        max_speed: 7.0,
+        max_acceleration: 16.0,
+        path_lookahead: 2.6,
+        obstacle_min_lookahead: 3.0,
+        obstacle_max_lookahead: 7.5,
+        obstacle_probe_radius: 0.38,
+        orbit_radius: 5.2,
+        orbit_speed: 0.85,
+        wander_radius: 2.0,
+        wander_distance: 2.8,
+        wander_jitter: 1.35,
         ..default()
     });
     app.init_resource::<LabDiagnostics>();
@@ -92,12 +120,21 @@ fn main() {
     app.add_plugins(BrpExtrasPlugin::with_port(lab_brp_port()));
     #[cfg(feature = "e2e")]
     app.add_plugins(e2e::SteeringLabE2EPlugin);
+    app.add_plugins((
+        bevy_flair::FlairPlugin,
+        bevy_input_focus::InputDispatchPlugin,
+        bevy_ui_widgets::UiWidgetsPlugins,
+        bevy_input_focus::tab_navigation::TabNavigationPlugin,
+        PanePlugin,
+    ))
+    .register_pane::<support::SteeringExamplePane>();
     app.add_plugins(steering::SteeringPlugin::default());
     app.add_systems(Startup, setup);
     app.add_systems(
         Update,
         (
             orbit_targets,
+            sync_pane,
             toggle_debug,
             update_lab_diagnostics,
             update_overlay,
@@ -356,6 +393,51 @@ fn setup(
         },
         arrive,
     ));
+
+    for (index, (start, goal, color)) in [
+        (
+            Vec3::new(-5.0, 0.6, -1.4),
+            Vec3::new(5.0, 0.6, -0.6),
+            Color::srgb(0.84, 0.64, 0.94),
+        ),
+        (
+            Vec3::new(-5.2, 0.6, 1.2),
+            Vec3::new(5.1, 0.6, 0.8),
+            Color::srgb(0.98, 0.66, 0.84),
+        ),
+        (
+            Vec3::new(5.0, 0.6, -0.8),
+            Vec3::new(-5.0, 0.6, -1.3),
+            Color::srgb(0.54, 0.82, 0.98),
+        ),
+        (
+            Vec3::new(5.3, 0.6, 1.1),
+            Vec3::new(-5.1, 0.6, 1.4),
+            Color::srgb(0.62, 0.92, 0.82),
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let entity = spawn_agent(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &format!("Crowd Agent {index}"),
+            color,
+            Transform::from_translation(start),
+        );
+        commands.entity(entity).insert((
+            CrowdAgent,
+            SteeringAgent::new(SteeringPlane::XZ)
+                .with_max_speed(5.6)
+                .with_max_acceleration(14.0),
+            SteeringAutoApply::default(),
+            Seek::new(SteeringTarget::Point(goal)),
+            Flocking::default(),
+            ReciprocalAvoidance::default(),
+        ));
+    }
 }
 
 fn spawn_agent(
@@ -443,6 +525,82 @@ fn orbit_targets(
     }
 }
 
+fn sync_pane(
+    pane: Res<support::SteeringExamplePane>,
+    mut debug: ResMut<SteeringDebugSettings>,
+    mut path_agents: Query<
+        (&mut SteeringAgent, &mut PathFollowing),
+        (
+            With<PathAgent>,
+            Without<AvoidanceAgent>,
+            Without<PursuitAgent>,
+            Without<WanderAgent>,
+        ),
+    >,
+    mut avoidance_agents: Query<
+        (&mut SteeringAgent, &mut ObstacleAvoidance),
+        (
+            With<AvoidanceAgent>,
+            Without<PathAgent>,
+            Without<PursuitAgent>,
+            Without<WanderAgent>,
+        ),
+    >,
+    mut pursuit_agents: Query<
+        (&mut SteeringAgent, &mut ObstacleAvoidance),
+        (
+            With<PursuitAgent>,
+            Without<PathAgent>,
+            Without<AvoidanceAgent>,
+            Without<WanderAgent>,
+        ),
+    >,
+    mut orbit_targets: Query<&mut OrbitMotion, With<OrbitTarget>>,
+    mut wander_agents: Query<
+        (&mut SteeringAgent, &mut Wander),
+        (
+            With<WanderAgent>,
+            Without<PathAgent>,
+            Without<AvoidanceAgent>,
+            Without<PursuitAgent>,
+        ),
+    >,
+) {
+    if !pane.is_changed() {
+        return;
+    }
+
+    debug.enabled = pane.debug_enabled;
+
+    for (mut agent, mut path) in &mut path_agents {
+        support::apply_agent_tuning(&mut agent, &pane);
+        path.path.lookahead_distance = pane.path_lookahead;
+        path.path.waypoint_tolerance = pane.path_tolerance;
+    }
+    for (mut agent, mut avoidance) in &mut avoidance_agents {
+        support::apply_agent_tuning(&mut agent, &pane);
+        avoidance.min_lookahead = pane.obstacle_min_lookahead;
+        avoidance.max_lookahead = pane.obstacle_max_lookahead;
+        avoidance.probe_radius = pane.obstacle_probe_radius;
+    }
+    for (mut agent, mut avoidance) in &mut pursuit_agents {
+        support::apply_agent_tuning(&mut agent, &pane);
+        avoidance.min_lookahead = pane.obstacle_min_lookahead;
+        avoidance.max_lookahead = pane.obstacle_max_lookahead;
+        avoidance.probe_radius = pane.obstacle_probe_radius;
+    }
+    for mut orbit in &mut orbit_targets {
+        orbit.radius = pane.orbit_radius;
+        orbit.speed = pane.orbit_speed;
+    }
+    for (mut agent, mut wander) in &mut wander_agents {
+        support::apply_agent_tuning(&mut agent, &pane);
+        wander.radius = pane.wander_radius;
+        wander.distance = pane.wander_distance;
+        wander.jitter_radians_per_second = pane.wander_jitter;
+    }
+}
+
 fn toggle_debug(keyboard: Res<ButtonInput<KeyCode>>, mut settings: ResMut<SteeringDebugSettings>) {
     if keyboard.just_pressed(KeyCode::Tab) {
         settings.enabled = !settings.enabled;
@@ -458,6 +616,7 @@ fn update_lab_diagnostics(
     pursuit_target: Query<&Transform, With<OrbitTarget>>,
     wander_agent: Query<&SteeringKinematics, With<WanderAgent>>,
     main_obstacle: Query<(&Transform, &SteeringObstacle), With<MainObstacle>>,
+    crowd_agents: Query<(&Transform, &SteeringDiagnostics), With<CrowdAgent>>,
 ) {
     diagnostics.active_agents = outputs
         .iter()
@@ -496,6 +655,42 @@ fn update_lab_diagnostics(
     if let Ok(wander_velocity) = wander_agent.single() {
         diagnostics.wander_speed = wander_velocity.linear_velocity.length();
     }
+
+    let crowd_samples = crowd_agents
+        .iter()
+        .map(|(transform, steering)| (transform.translation, steering))
+        .collect::<Vec<_>>();
+
+    let frame_peak_flock_neighbors = crowd_samples
+        .iter()
+        .map(|(_, steering)| steering.flock_neighbor_count)
+        .max()
+        .unwrap_or(0);
+    let frame_peak_neighbors = crowd_samples
+        .iter()
+        .map(|(_, steering)| steering.crowd_neighbor_count)
+        .max()
+        .unwrap_or(0);
+    let frame_conflicts = crowd_samples
+        .iter()
+        .filter(|(_, steering)| steering.crowd_avoidance_velocity.is_some())
+        .count() as u32;
+
+    diagnostics.crowd_peak_flock_neighbors = diagnostics
+        .crowd_peak_flock_neighbors
+        .max(frame_peak_flock_neighbors);
+    diagnostics.crowd_peak_neighbors = diagnostics.crowd_peak_neighbors.max(frame_peak_neighbors);
+    diagnostics.crowd_conflict_frames += frame_conflicts;
+
+    if crowd_samples.len() >= 2 {
+        for (index, (position, _)) in crowd_samples.iter().enumerate() {
+            for (other_position, _) in crowd_samples.iter().skip(index + 1) {
+                diagnostics.crowd_min_separation = diagnostics
+                    .crowd_min_separation
+                    .min(position.distance(*other_position));
+            }
+        }
+    }
 }
 
 fn update_overlay(
@@ -515,6 +710,10 @@ avoidance clearance min: {:.2}\n\
 avoidance passed obstacle: {}\n\
 pursuit distance: {:.2}\n\
 wander speed: {:.2}\n\
+crowd flock peak: {}\n\
+crowd neighbors peak: {}\n\
+crowd conflict frames: {}\n\
+crowd min separation: {:.2}\n\
 debug gizmos: {} (Tab)",
         diagnostics.active_agents,
         diagnostics.path_waypoint,
@@ -523,6 +722,10 @@ debug gizmos: {} (Tab)",
         diagnostics.avoidance_passed_obstacle,
         diagnostics.pursuit_distance,
         diagnostics.wander_speed,
+        diagnostics.crowd_peak_flock_neighbors,
+        diagnostics.crowd_peak_neighbors,
+        diagnostics.crowd_conflict_frames,
+        diagnostics.crowd_min_separation,
         if debug.enabled { "on" } else { "off" },
     )
     .into();

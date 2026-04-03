@@ -117,6 +117,27 @@ All units are world units, seconds, and radians.
 | `arrival_tolerance` | `f32` | `0.3` | Final settle distance for once-paths |
 | `tuning` | `BehaviorTuning` | `weight=1, priority=40` | Standard behavior tuning |
 
+## `Flocking`
+
+| Field | Type | Default | Valid Range | Effect |
+| --- | --- | --- | --- | --- |
+| `neighbor_distance` | `f32` | `3.0` | `>= 0.0` | Maximum range used to gather neighbor agents |
+| `separation_weight` | `f32` | `1.5` | `>= 0.0` | Strength of short-range push away from neighbors |
+| `alignment_weight` | `f32` | `1.0` | `>= 0.0` | Strength of heading matching toward average neighbor velocity |
+| `cohesion_weight` | `f32` | `0.75` | `>= 0.0` | Strength of pull toward the local group center |
+| `tuning` | `BehaviorTuning` | `weight=1, priority=30` | Standard behavior tuning |
+
+## `ReciprocalAvoidance`
+
+| Field | Type | Default | Valid Range | Effect |
+| --- | --- | --- | --- | --- |
+| `neighbor_distance` | `f32` | `3.0` | `>= 0.0` | Maximum distance used to gather crowd neighbors |
+| `time_horizon` | `f32` | `1.0` | `> 0.0` recommended | Prediction window for relative collision checks |
+| `comfort_distance` | `f32` | `0.1` | `>= 0.0` | Extra spacing margin beyond body radii |
+| `side_bias` | `f32` | `1.0` | `>= 0.0` | Strength of the lateral sidestep relative to the brake response |
+| `max_neighbors` | `usize` | `8` | `>= 1` | Upper bound on crowd neighbors sampled per agent |
+| `tuning` | `BehaviorTuning` | `weight=1, priority=5` | Standard behavior tuning |
+
 ## `SteeringAutoApply`
 
 | Field | Type | Default | Effect |
@@ -143,6 +164,7 @@ All units are world units, seconds, and radians.
 
 - `ObstacleAvoidance::probe_radius` combines with `SteeringAgent::body_radius`.
 - `ObstacleAvoidance` works best with `SteeringComposition::PrioritizedAccumulation`; weighted blend is useful only when you want softer, less dominant avoidance.
+- `Flocking` and `ReciprocalAvoidance` both read the current steering-agent snapshot. Their neighborhood cost grows quickly with crowd size, so keep `neighbor_distance` conservative and disable the behavior on agents that do not need it.
 - `PathFollowing::arrival_tolerance` should usually stay less than or equal to `SteeringPath::waypoint_tolerance`.
 - Large `Wander::jitter_radians_per_second` with low `max_acceleration` creates visible lag; high jitter with high acceleration creates noisy motion.
 - If `velocity_source` is `TransformDelta`, add `SteeringTrackedVelocity` to moving target entities you want pursue/evade to predict.

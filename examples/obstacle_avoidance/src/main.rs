@@ -5,10 +5,27 @@ use steering::{
     ObstacleAvoidance, Seek, SteeringAgent, SteeringAutoApply, SteeringPlane, SteeringTarget,
 };
 
+#[derive(Component)]
+struct GoalMarker;
+
+#[derive(Component)]
+struct AvoidanceAgent;
+
 fn main() {
     let mut app = App::new();
+    app.insert_resource(support::SteeringExamplePane {
+        max_speed: 5.5,
+        max_acceleration: 12.0,
+        target_x: 7.0,
+        target_z: 0.0,
+        obstacle_min_lookahead: 2.0,
+        obstacle_max_lookahead: 5.0,
+        obstacle_probe_radius: 0.25,
+        ..default()
+    });
     support::configure_3d_app(&mut app, "steering: obstacle avoidance");
     app.add_systems(Startup, setup);
+    app.add_systems(Update, sync_pane);
     app.run();
 }
 
@@ -18,7 +35,7 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let target_position = Vec3::new(7.0, 0.6, 0.0);
-    support::spawn_target_marker(
+    let goal = support::spawn_target_marker(
         &mut commands,
         &mut meshes,
         &mut materials,
@@ -26,6 +43,7 @@ fn setup(
         Color::srgb(0.95, 0.82, 0.22),
         Transform::from_translation(target_position),
     );
+    commands.entity(goal).insert(GoalMarker);
     support::spawn_box_obstacle(
         &mut commands,
         &mut meshes,
@@ -53,6 +71,7 @@ fn setup(
     );
 
     commands.entity(agent).insert((
+        AvoidanceAgent,
         SteeringAgent::new(SteeringPlane::XZ)
             .with_max_speed(5.5)
             .with_max_acceleration(12.0),
@@ -65,4 +84,29 @@ fn setup(
             ..default()
         },
     ));
+}
+
+fn sync_pane(
+    pane: Res<support::SteeringExamplePane>,
+    mut goals: Query<&mut Transform, With<GoalMarker>>,
+    mut agents: Query<
+        (&mut SteeringAgent, &mut Seek, &mut ObstacleAvoidance),
+        With<AvoidanceAgent>,
+    >,
+) {
+    if !pane.is_changed() {
+        return;
+    }
+
+    let target = support::pane_target_translation_3d(&pane);
+    for mut transform in &mut goals {
+        transform.translation = target;
+    }
+    for (mut agent, mut seek, mut avoidance) in &mut agents {
+        support::apply_agent_tuning(&mut agent, &pane);
+        seek.target = SteeringTarget::Point(target);
+        avoidance.min_lookahead = pane.obstacle_min_lookahead;
+        avoidance.max_lookahead = pane.obstacle_max_lookahead;
+        avoidance.probe_radius = pane.obstacle_probe_radius;
+    }
 }

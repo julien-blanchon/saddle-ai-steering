@@ -15,7 +15,7 @@ The crate focuses on classical steering output, not high-level decision-making a
 
 ```toml
 [dependencies]
-steering = { path = "shared/ai/steering" }
+saddle-ai-steering = { git = "https://github.com/julien-blanchon/saddle-ai-steering" }
 ```
 
 ```rust,no_run
@@ -85,7 +85,7 @@ For apps where steering should stay active for the entire app lifetime, `Steerin
   `SteeringTarget`, `SteeringPath`, `SteeringObstacle`, `SteeringObstacleShape`,
   `SteeringPlane`, `SteeringComposition`, `SteeringLayerMask`
 - Behavior components:
-  `Seek`, `Flee`, `Arrive`, `Pursue`, `Evade`, `Wander`, `ObstacleAvoidance`, `PathFollowing`
+  `Seek`, `Flee`, `Arrive`, `Pursue`, `Evade`, `Wander`, `ObstacleAvoidance`, `PathFollowing`, `Flocking`, `ReciprocalAvoidance`
 - Behavior runtime state:
   `WanderState`, `PathFollowingState`
 - Debug resources:
@@ -103,12 +103,15 @@ For apps where steering should stay active for the entire app lifetime, `Steerin
 | `Wander` | Deterministic seeded drift | `seed`, `radius`, `distance`, `jitter_radians_per_second` | Uses a wander-circle style target with seeded drift |
 | `ObstacleAvoidance` | Local static-obstacle avoidance | `layers`, `min_lookahead`, `max_lookahead`, `probe_radius` | Probe-based, priority-friendly, no physics dependency |
 | `PathFollowing` | Follow waypoint paths with lookahead | `SteeringPath`, `slowing_radius`, `arrival_tolerance` | Supports once, loop, and ping-pong path modes |
+| `Flocking` | Separation, alignment, and cohesion around nearby agents | `neighbor_distance`, `separation_weight`, `alignment_weight`, `cohesion_weight` | Classical boids-style local group motion that reads nearby steering agents |
+| `ReciprocalAvoidance` | Agent-agent local deflection | `neighbor_distance`, `time_horizon`, `comfort_distance`, `side_bias` | Lightweight reciprocal crowd avoidance without requiring a physics or navmesh dependency |
 
 ## Design Decisions
 
 - **Output representation**: `SteeringOutput` carries both `linear_acceleration` and `desired_velocity`.
 - **Default arbitration**: `SteeringAgent::default()` uses `SteeringComposition::PrioritizedAccumulation` so obstacle avoidance can dominate without special-case branching. Weighted blending is still available.
 - **Obstacle avoidance model**: local probe sampling against explicit `SteeringObstacle` entities. It generates its own contribution after the non-avoid behaviors are preview-composed, so the probe heading can follow seek, arrive, pursue, or path-follow output.
+- **Crowd behaviors**: flocking and reciprocal avoidance stay component-based like the rest of the crate. They read nearby `SteeringAgent` snapshots and produce ordinary steering contributions, so they compose with path following and obstacle avoidance instead of becoming a separate movement mode.
 - **2D and 3D API**: the public API stays `Vec3`-first. `SteeringPlane::{XY, XZ, Free3d}` constrains movement and orientation without duplicating the whole surface area for `Vec2`.
 - **Wander determinism**: each `Wander` behavior seeds a per-entity `WanderState`, then advances it with an internal xorshift sequence. Fixed-step or E2E runs remain reproducible.
 - **Arrival and corner jitter control**: `Arrive` exposes `slowing_radius`, `arrival_tolerance`, and `speed_curve_exponent`. `PathFollowing` adds waypoint tolerance plus lookahead so agents do not pinball around corners.
@@ -140,13 +143,14 @@ Full parameter reference:
 
 | Example | Purpose | Run |
 | --- | --- | --- |
-| `basic` | One agent seeking a fixed target | `cargo run -p steering --example basic` |
-| `arrive` | Slowing-radius settle at a target | `cargo run -p steering --example arrive` |
-| `wander` | Deterministic wandering agent | `cargo run -p steering --example wander` |
-| `obstacle_avoidance` | Seek through static obstacles with probe debug | `cargo run -p steering --example obstacle_avoidance` |
-| `path_following` | Looping waypoint follow with lookahead | `cargo run -p steering --example path_following` |
-| `blended` | Pursue + avoid + path follow in one scene | `cargo run -p steering --example blended` |
-| `kinematic_2d` | Top-down `XY` usage with sprites | `cargo run -p steering --example kinematic_2d` |
+| `basic` | One agent seeking a fixed target | `cargo run --manifest-path examples/Cargo.toml -p steering_example_basic` |
+| `arrive` | Slowing-radius settle at a target | `cargo run --manifest-path examples/Cargo.toml -p steering_example_arrive` |
+| `wander` | Deterministic wandering agent | `cargo run --manifest-path examples/Cargo.toml -p steering_example_wander` |
+| `obstacle_avoidance` | Seek through static obstacles with probe debug | `cargo run --manifest-path examples/Cargo.toml -p steering_example_obstacle_avoidance` |
+| `path_following` | Looping waypoint follow with lookahead | `cargo run --manifest-path examples/Cargo.toml -p steering_example_path_following` |
+| `blended` | Pursue + avoid + path follow in one scene | `cargo run --manifest-path examples/Cargo.toml -p steering_example_blended` |
+| `flocking` | Boids-style local crowd motion with reciprocal avoidance | `cargo run --manifest-path examples/Cargo.toml -p steering_example_flocking` |
+| `kinematic_2d` | Top-down `XY` usage with sprites | `cargo run --manifest-path examples/Cargo.toml -p steering_example_kinematic_2d` |
 | `steering_lab` | Crate-local BRP/E2E showcase | `cargo run -p steering_lab` |
 
 ## Crate-Local Lab
@@ -154,22 +158,22 @@ Full parameter reference:
 `shared/ai/steering/examples/lab` is the verification app for this crate.
 
 ```bash
-cargo run -p steering_lab
+cargo run --manifest-path examples/Cargo.toml -p steering_lab
 ```
 
 E2E commands:
 
 ```bash
-cargo run -p steering_lab --features e2e -- smoke_launch
-cargo run -p steering_lab --features e2e -- steering_smoke
-cargo run -p steering_lab --features e2e -- steering_path_following
-cargo run -p steering_lab --features e2e -- steering_avoidance
+cargo run --manifest-path examples/Cargo.toml -p steering_lab --features e2e -- smoke_launch
+cargo run --manifest-path examples/Cargo.toml -p steering_lab --features e2e -- steering_smoke
+cargo run --manifest-path examples/Cargo.toml -p steering_lab --features e2e -- steering_path_following
+cargo run --manifest-path examples/Cargo.toml -p steering_lab --features e2e -- steering_avoidance
 ```
 
 ## Limitations
 
-- v0.1 obstacle avoidance is classic local steering, not crowd simulation and not reciprocal avoidance. It is designed for agents versus explicit static obstacles, not dense crowds.
-- Built-in obstacle evaluation is `O(agents * obstacles)` each update. This is documented and expected in v0.1.
+- Reciprocal avoidance is a lightweight local solver, not a full ORCA implementation with linear-program guarantees. It is designed to be easy to debug and good enough for medium-density crowds.
+- Built-in crowd and obstacle evaluation are both neighborhood scans over live ECS data. Flocking and reciprocal avoidance are `O(agents^2)` in the worst case; obstacle evaluation is `O(agents * obstacles)`.
 - Debug gizmos intentionally reflect the actual arrival targets, configured wander radius, and chosen avoidance direction so BRP and screenshot-based debugging stay trustworthy.
 - `Free3d` orientation aligns yaw and pitch only. It does not solve roll or banking.
 - AABB avoidance uses analytic segment-vs-box tests. If you need collider-accurate avoidance, feed a higher-quality world adapter into your own movement layer and keep `steering` as the locomotion-intent stage.

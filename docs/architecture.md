@@ -91,6 +91,21 @@ The plane:
 
 This avoids separate `Vec2` and `Vec3` APIs while still keeping planar behavior explicit.
 
+## Crowd Behaviors
+
+Two behaviors now read neighboring steering agents directly:
+
+- `Flocking`
+- `ReciprocalAvoidance`
+
+The pipeline stays ECS-friendly:
+
+1. gather a lightweight snapshot of nearby steering agents
+2. evaluate flocking and reciprocal-avoidance contributions from that snapshot
+3. merge those contributions through the same composition policy as seek, arrive, and path following
+
+That keeps crowd motion additive and debuggable instead of introducing a separate movement mode or solver-owned transform stage.
+
 ## Jitter and Oscillation Control
 
 The crate avoids common classical-steering failure modes with:
@@ -124,10 +139,12 @@ The plugin auto-inserts them when required. They stay public because they are us
   `O(agents * path_lookahead_segments)` with small path-local scans
 - obstacle avoidance:
   `O(agents * obstacles)`
+- flocking / reciprocal avoidance:
+  `O(agents * neighbors)` with worst-case `O(agents^2)` if every crowd agent sees every other crowd agent
 
 ### v0.1 tradeoff
 
-The obstacle stage is intentionally straightforward and debuggable rather than spatially indexed. For many games this is acceptable because only a subset of agents need local avoidance each frame and the obstacle set is moderate.
+The local-avoidance stages are intentionally straightforward and debuggable rather than spatially indexed. For many games this is acceptable because only a subset of agents need local avoidance each frame and the crowd / obstacle sets are moderate.
 
 If a consumer needs larger-scale obstacle counts, the recommended extension is:
 
@@ -139,9 +156,9 @@ If a consumer needs larger-scale obstacle counts, the recommended extension is:
 
 The design leaves room for future work without breaking the core API:
 
-- separation/cohesion/alignment flocking behaviors
 - context-steering or sampled-direction backends
 - obstacle broad-phase adapters
+- full ORCA / RVO-style reciprocal solvers
 - custom target resolvers
 - spline-backed path sampling
 - custom application systems for physics or animation pipelines

@@ -39,6 +39,9 @@ pub struct SteeringStats {
     pub active_behaviors: usize,
     pub obstacle_tests: usize,
     pub obstacle_hits: usize,
+    pub flock_neighbors: usize,
+    pub crowd_neighbors: usize,
+    pub crowd_conflicts: usize,
 }
 
 #[derive(Resource, Default)]

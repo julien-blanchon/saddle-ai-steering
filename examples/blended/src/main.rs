@@ -13,10 +13,23 @@ struct OrbitTarget {
     speed: f32,
 }
 
+#[derive(Component)]
+struct PursuitAgent;
+
 fn main() {
     let mut app = App::new();
+    app.insert_resource(support::SteeringExamplePane {
+        max_speed: 6.0,
+        max_acceleration: 13.0,
+        orbit_radius: 5.2,
+        orbit_speed: 0.75,
+        obstacle_min_lookahead: 1.5,
+        obstacle_max_lookahead: 4.5,
+        ..default()
+    });
     support::configure_3d_app(&mut app, "steering: blended");
     app.add_systems(Startup, setup);
+    app.add_systems(Update, sync_pane);
     app.add_systems(Update, orbit_target);
     app.run();
 }
@@ -69,6 +82,7 @@ fn setup(
         Transform::from_xyz(-7.0, 0.6, -5.0),
     );
     commands.entity(pursuer).insert((
+        PursuitAgent,
         SteeringAgent::new(SteeringPlane::XZ)
             .with_max_speed(6.0)
             .with_max_acceleration(13.0),
@@ -76,6 +90,27 @@ fn setup(
         Pursue::new(SteeringTarget::Entity(target)),
         ObstacleAvoidance::default(),
     ));
+}
+
+fn sync_pane(
+    pane: Res<support::SteeringExamplePane>,
+    mut targets: Query<&mut OrbitTarget>,
+    mut agents: Query<(&mut SteeringAgent, &mut ObstacleAvoidance), With<PursuitAgent>>,
+) {
+    if !pane.is_changed() {
+        return;
+    }
+
+    for mut orbit in &mut targets {
+        orbit.radius = pane.orbit_radius;
+        orbit.speed = pane.orbit_speed;
+    }
+    for (mut agent, mut avoidance) in &mut agents {
+        support::apply_agent_tuning(&mut agent, &pane);
+        avoidance.min_lookahead = pane.obstacle_min_lookahead;
+        avoidance.max_lookahead = pane.obstacle_max_lookahead;
+        avoidance.probe_radius = pane.obstacle_probe_radius;
+    }
 }
 
 fn orbit_target(time: Res<Time>, mut targets: Query<(&OrbitTarget, &mut Transform)>) {
