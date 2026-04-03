@@ -1,6 +1,6 @@
 use crate::{
     components::{ReciprocalAvoidance, SteeringAgent, SteeringLayerMask, SteeringPlane},
-    math::{clamp_magnitude, desired_velocity_intent, LinearIntent, STEERING_EPSILON},
+    math::{LinearIntent, STEERING_EPSILON, clamp_magnitude, desired_velocity_intent},
 };
 use bevy::prelude::*;
 
