@@ -138,6 +138,36 @@ All units are world units, seconds, and radians.
 | `max_neighbors` | `usize` | `8` | `>= 1` | Upper bound on crowd neighbors sampled per agent |
 | `tuning` | `BehaviorTuning` | `weight=1, priority=5` | Standard behavior tuning |
 
+## `LeaderFollowing`
+
+| Field | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `leader` | `SteeringTarget` | required | Entity or point to follow behind |
+| `behind_distance` | `f32` | `2.5` | How far behind the leader to position |
+| `leader_sight_radius` | `f32` | `2.0` | If the agent is ahead of the leader within this radius, evade sideways |
+| `slowing_radius` | `f32` | `3.0` | Slowing radius for arrive at the behind point |
+| `arrival_tolerance` | `f32` | `0.4` | Settle distance at the behind point |
+| `tuning` | `BehaviorTuning` | `weight=1, priority=42` | Standard behavior tuning |
+
+## `Formation`
+
+| Field | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `anchor` | `SteeringTarget` | required | Formation anchor entity or point |
+| `slot_offset` | `Vec3` | required | Offset from anchor in anchor-local space (rotated by anchor velocity direction) |
+| `slowing_radius` | `f32` | `2.5` | Slowing radius for arrive at slot |
+| `arrival_tolerance` | `f32` | `0.3` | Settle distance at slot |
+| `tuning` | `BehaviorTuning` | `weight=1, priority=42` | Standard behavior tuning |
+
+## `Containment`
+
+| Field | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `center` | `Vec3` | required | Center of the bounding region |
+| `radius` | `f32` | required | Radius of the bounding sphere |
+| `margin` | `f32` | `radius * 0.25` | Distance from boundary where steering activates |
+| `tuning` | `BehaviorTuning` | `weight=1, priority=8` | Standard behavior tuning (high priority by default) |
+
 ## `SteeringAutoApply`
 
 | Field | Type | Default | Effect |

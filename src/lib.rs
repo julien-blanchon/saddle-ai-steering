@@ -8,12 +8,12 @@ mod resources;
 mod systems;
 
 pub use crate::components::{
-    Arrive, BehaviorTuning, Evade, Flee, Flocking, ObstacleAvoidance, PathFollowing,
-    PathFollowingState, Pursue, ReciprocalAvoidance, Seek, SteeringAgent, SteeringAlignment,
-    SteeringAutoApply, SteeringBehaviorKind, SteeringComposition, SteeringContribution,
-    SteeringDebugAgent, SteeringDiagnostics, SteeringFacingMode, SteeringKinematics,
-    SteeringLayerMask, SteeringObstacle, SteeringObstacleShape, SteeringOutput, SteeringPath,
-    SteeringPathMode, SteeringPlane, SteeringTarget, SteeringTrackedVelocity,
+    Arrive, BehaviorTuning, Containment, Evade, Flee, Flocking, Formation, LeaderFollowing,
+    ObstacleAvoidance, PathFollowing, PathFollowingState, Pursue, ReciprocalAvoidance, Seek,
+    SteeringAgent, SteeringAlignment, SteeringAutoApply, SteeringBehaviorKind, SteeringComposition,
+    SteeringContribution, SteeringDebugAgent, SteeringDiagnostics, SteeringFacingMode,
+    SteeringKinematics, SteeringLayerMask, SteeringObstacle, SteeringObstacleShape, SteeringOutput,
+    SteeringPath, SteeringPathMode, SteeringPlane, SteeringTarget, SteeringTrackedVelocity,
     SteeringVelocitySource, Wander, WanderState,
 };
 pub use crate::debug::SteeringDebugGizmos;
@@ -78,9 +78,12 @@ impl Plugin for SteeringPlugin {
             .init_gizmo_group::<debug::SteeringDebugGizmos>()
             .register_type::<Arrive>()
             .register_type::<BehaviorTuning>()
+            .register_type::<Containment>()
             .register_type::<Evade>()
             .register_type::<Flee>()
             .register_type::<Flocking>()
+            .register_type::<Formation>()
+            .register_type::<LeaderFollowing>()
             .register_type::<ObstacleAvoidance>()
             .register_type::<PathFollowing>()
             .register_type::<PathFollowingState>()

@@ -10,8 +10,8 @@ use saddle_pane::prelude::*;
 use steering::{
     Arrive, Flocking, ObstacleAvoidance, PathFollowing, PathFollowingState, Pursue,
     ReciprocalAvoidance, Seek, SteeringAgent, SteeringAutoApply, SteeringDebugSettings,
-    SteeringDiagnostics, SteeringKinematics, SteeringObstacle, SteeringObstacleShape,
-    SteeringPath, SteeringPlane, SteeringTarget, SteeringTrackedVelocity, Wander,
+    SteeringDiagnostics, SteeringKinematics, SteeringObstacle, SteeringObstacleShape, SteeringPath,
+    SteeringPlane, SteeringTarget, SteeringTrackedVelocity, Wander,
 };
 use steering_example_support as support;
 

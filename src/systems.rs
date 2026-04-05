@@ -139,16 +139,23 @@ pub(crate) fn evaluate_agents(
         &Transform,
         &GlobalTransform,
         &SteeringKinematics,
-        Option<&Seek>,
-        Option<&Flee>,
-        Option<&Arrive>,
-        Option<&Pursue>,
-        Option<&Evade>,
-        Option<&Wander>,
-        Option<&Flocking>,
-        Option<&ObstacleAvoidance>,
-        Option<&ReciprocalAvoidance>,
-        Option<&PathFollowing>,
+        (
+            Option<&Seek>,
+            Option<&Flee>,
+            Option<&Arrive>,
+            Option<&Pursue>,
+            Option<&Evade>,
+            Option<&Wander>,
+        ),
+        (
+            Option<&Flocking>,
+            Option<&ObstacleAvoidance>,
+            Option<&ReciprocalAvoidance>,
+            Option<&PathFollowing>,
+            Option<&LeaderFollowing>,
+            Option<&Formation>,
+            Option<&Containment>,
+        ),
     )>,
     mut wander_states: Query<&mut WanderState>,
     mut path_states: Query<&mut PathFollowingState>,
@@ -168,23 +175,7 @@ pub(crate) fn evaluate_agents(
     let crowd_neighbors = agents
         .iter()
         .map(
-            |(
-                entity,
-                agent,
-                _transform,
-                global_transform,
-                kinematics,
-                _seek,
-                _flee,
-                _arrive,
-                _pursue,
-                _evade,
-                _wander,
-                _flocking,
-                _obstacle_avoidance,
-                _reciprocal_avoidance,
-                _path_following,
-            )| CrowdNeighbor {
+            |(entity, agent, _transform, global_transform, kinematics, _, _)| CrowdNeighbor {
                 entity,
                 position: global_transform.translation(),
                 velocity: kinematics.linear_velocity,
@@ -201,16 +192,16 @@ pub(crate) fn evaluate_agents(
         transform,
         global_transform,
         kinematics,
-        seek,
-        flee,
-        arrive,
-        pursue,
-        evade,
-        wander,
-        flocking,
-        obstacle_avoidance,
-        reciprocal_avoidance,
-        path_following,
+        (seek, flee, arrive, pursue, evade, wander),
+        (
+            flocking,
+            obstacle_avoidance,
+            reciprocal_avoidance,
+            path_following,
+            leader_following,
+            formation,
+            containment,
+        ),
     ) in &agents
     {
         stats.evaluated_agents += 1;
@@ -235,6 +226,7 @@ pub(crate) fn evaluate_agents(
         let mut avoidance_obstacle = None;
         let mut crowd_avoidance_velocity = None;
         let mut crowd_neighbor_count = 0_usize;
+        let mut formation_slot_position = None;
 
         if let Some(seek) = seek {
             if seek.tuning.enabled {
@@ -443,6 +435,84 @@ pub(crate) fn evaluate_agents(
             }
         }
 
+        if let Some(leader_following) = leader_following {
+            if leader_following.tuning.enabled {
+                if let Some(target) =
+                    resolve_target(leader_following.leader, position, &targets, agent.plane)
+                {
+                    let (intent, debug) = behaviors::leader_following::evaluate(
+                        position,
+                        current_velocity,
+                        target.position,
+                        target.velocity,
+                        agent.plane,
+                        agent.max_speed,
+                        agent.max_acceleration,
+                        leader_following.behind_distance,
+                        leader_following.leader_sight_radius,
+                        leader_following.slowing_radius,
+                        leader_following.arrival_tolerance,
+                    );
+                    primary_target = Some(debug.behind_point);
+                    push_contribution(
+                        &mut contributions,
+                        SteeringBehaviorKind::LeaderFollowing,
+                        leader_following.tuning,
+                        intent,
+                    );
+                }
+            }
+        }
+
+        if let Some(formation) = formation {
+            if formation.tuning.enabled {
+                if let Some(target) =
+                    resolve_target(formation.anchor, position, &targets, agent.plane)
+                {
+                    let (intent, debug) = behaviors::formation::evaluate(
+                        position,
+                        current_velocity,
+                        target.position,
+                        target.velocity,
+                        agent.plane,
+                        agent.max_speed,
+                        agent.max_acceleration,
+                        formation.slot_offset,
+                        formation.slowing_radius,
+                        formation.arrival_tolerance,
+                    );
+                    formation_slot_position = Some(debug.slot_world_position);
+                    push_contribution(
+                        &mut contributions,
+                        SteeringBehaviorKind::Formation,
+                        formation.tuning,
+                        intent,
+                    );
+                }
+            }
+        }
+
+        if let Some(containment) = containment {
+            if containment.tuning.enabled {
+                let intent = behaviors::containment::evaluate(
+                    position,
+                    current_velocity,
+                    containment.center,
+                    containment.radius,
+                    containment.margin,
+                    agent.plane,
+                    agent.max_speed,
+                    agent.max_acceleration,
+                );
+                push_contribution(
+                    &mut contributions,
+                    SteeringBehaviorKind::Containment,
+                    containment.tuning,
+                    intent,
+                );
+            }
+        }
+
         let mut preview_contributions = contributions.clone();
         let pre_avoidance_velocity = math::compose_contributions(
             agent.composition,
@@ -584,6 +654,7 @@ pub(crate) fn evaluate_agents(
             crowd_avoidance_velocity,
             crowd_neighbor_count,
             pre_avoidance_velocity,
+            formation_slot_position,
         };
     }
 }

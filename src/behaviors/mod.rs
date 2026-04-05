@@ -1,7 +1,10 @@
 pub(crate) mod arrive;
+pub(crate) mod containment;
 pub(crate) mod evade;
 pub(crate) mod flee;
 pub(crate) mod flocking;
+pub(crate) mod formation;
+pub(crate) mod leader_following;
 pub(crate) mod obstacle_avoidance;
 pub(crate) mod path_following;
 pub(crate) mod pursue;

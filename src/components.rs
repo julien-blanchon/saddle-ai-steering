@@ -89,6 +89,9 @@ pub enum SteeringBehaviorKind {
     ObstacleAvoidance,
     ReciprocalAvoidance,
     PathFollowing,
+    LeaderFollowing,
+    Formation,
+    Containment,
     Brake,
 }
 
@@ -372,6 +375,7 @@ pub struct SteeringDiagnostics {
     pub crowd_avoidance_velocity: Option<Vec3>,
     pub crowd_neighbor_count: usize,
     pub pre_avoidance_velocity: Vec3,
+    pub formation_slot_position: Option<Vec3>,
 }
 
 #[derive(Component, Reflect, Clone, Copy, Debug, PartialEq)]
@@ -664,4 +668,85 @@ pub struct PathFollowingState {
     pub direction: i8,
     pub completed: bool,
     pub completed_cycles: u32,
+}
+
+#[derive(Component, Reflect, Clone, Debug, PartialEq)]
+#[reflect(Component)]
+pub struct LeaderFollowing {
+    pub leader: SteeringTarget,
+    pub behind_distance: f32,
+    pub leader_sight_radius: f32,
+    pub slowing_radius: f32,
+    pub arrival_tolerance: f32,
+    pub tuning: BehaviorTuning,
+}
+
+impl LeaderFollowing {
+    pub fn new(leader: SteeringTarget) -> Self {
+        Self {
+            leader,
+            behind_distance: 2.5,
+            leader_sight_radius: 2.0,
+            slowing_radius: 3.0,
+            arrival_tolerance: 0.4,
+            tuning: BehaviorTuning::new(1.0, 42),
+        }
+    }
+
+    pub fn with_behind_distance(mut self, behind_distance: f32) -> Self {
+        self.behind_distance = behind_distance;
+        self
+    }
+
+    pub fn with_leader_sight_radius(mut self, leader_sight_radius: f32) -> Self {
+        self.leader_sight_radius = leader_sight_radius;
+        self
+    }
+}
+
+#[derive(Component, Reflect, Clone, Debug, PartialEq)]
+#[reflect(Component)]
+pub struct Formation {
+    pub anchor: SteeringTarget,
+    pub slot_offset: Vec3,
+    pub slowing_radius: f32,
+    pub arrival_tolerance: f32,
+    pub tuning: BehaviorTuning,
+}
+
+impl Formation {
+    pub fn new(anchor: SteeringTarget, slot_offset: Vec3) -> Self {
+        Self {
+            anchor,
+            slot_offset,
+            slowing_radius: 2.5,
+            arrival_tolerance: 0.3,
+            tuning: BehaviorTuning::new(1.0, 42),
+        }
+    }
+}
+
+#[derive(Component, Reflect, Clone, Debug, PartialEq)]
+#[reflect(Component)]
+pub struct Containment {
+    pub center: Vec3,
+    pub radius: f32,
+    pub margin: f32,
+    pub tuning: BehaviorTuning,
+}
+
+impl Containment {
+    pub fn new(center: Vec3, radius: f32) -> Self {
+        Self {
+            center,
+            radius,
+            margin: radius * 0.25,
+            tuning: BehaviorTuning::new(1.0, 8),
+        }
+    }
+
+    pub fn with_margin(mut self, margin: f32) -> Self {
+        self.margin = margin;
+        self
+    }
 }

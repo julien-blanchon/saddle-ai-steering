@@ -85,7 +85,7 @@ For apps where steering should stay active for the entire app lifetime, `Steerin
   `SteeringTarget`, `SteeringPath`, `SteeringObstacle`, `SteeringObstacleShape`,
   `SteeringPlane`, `SteeringComposition`, `SteeringLayerMask`
 - Behavior components:
-  `Seek`, `Flee`, `Arrive`, `Pursue`, `Evade`, `Wander`, `ObstacleAvoidance`, `PathFollowing`, `Flocking`, `ReciprocalAvoidance`
+  `Seek`, `Flee`, `Arrive`, `Pursue`, `Evade`, `Wander`, `ObstacleAvoidance`, `PathFollowing`, `Flocking`, `ReciprocalAvoidance`, `LeaderFollowing`, `Formation`, `Containment`
 - Behavior runtime state:
   `WanderState`, `PathFollowingState`
 - Debug resources:
@@ -105,6 +105,18 @@ For apps where steering should stay active for the entire app lifetime, `Steerin
 | `PathFollowing` | Follow waypoint paths with lookahead | `SteeringPath`, `slowing_radius`, `arrival_tolerance` | Supports once, loop, and ping-pong path modes |
 | `Flocking` | Separation, alignment, and cohesion around nearby agents | `neighbor_distance`, `separation_weight`, `alignment_weight`, `cohesion_weight` | Classical boids-style local group motion that reads nearby steering agents |
 | `ReciprocalAvoidance` | Agent-agent local deflection | `neighbor_distance`, `time_horizon`, `comfort_distance`, `side_bias` | Lightweight reciprocal crowd avoidance without requiring a physics or navmesh dependency |
+| `LeaderFollowing` | Follow behind a leader entity | `leader`, `behind_distance`, `leader_sight_radius` | Arrives at a point behind the leader; evades sideways if ahead of the leader's forward cone |
+| `Formation` | Hold a slot relative to an anchor | `anchor`, `slot_offset` | Anchor-local offset is rotated by anchor's velocity direction; uses arrive for positioning |
+| `Containment` | Stay within a bounding region | `center`, `radius`, `margin` | Steers back toward center when approaching the boundary, with force scaling by proximity |
+
+## Steering vs Navmesh
+
+This crate and `saddle-ai-navmesh` are **complementary**, not overlapping:
+
+- **Navmesh**: global pathfinding — surface baking, corridor queries, waypoint routes
+- **Steering**: local locomotion intent — seek, flee, flocking, obstacle avoidance, formation
+
+The typical integration pipeline: navmesh computes a path, steering follows it with `PathFollowing` while handling local avoidance and flocking. See the `steering_integration` example in `saddle-ai-navmesh` for a working demo.
 
 ## Design Decisions
 
@@ -151,6 +163,9 @@ Full parameter reference:
 | `blended` | Pursue + avoid + path follow in one scene | `cargo run --manifest-path examples/Cargo.toml -p steering_example_blended` |
 | `flocking` | Boids-style local crowd motion with reciprocal avoidance | `cargo run --manifest-path examples/Cargo.toml -p steering_example_flocking` |
 | `kinematic_2d` | Top-down `XY` usage with sprites | `cargo run --manifest-path examples/Cargo.toml -p steering_example_kinematic_2d` |
+| `pursuit_evasion` | Predator-prey chase with obstacle avoidance and containment | `cargo run --manifest-path examples/Cargo.toml -p steering_example_pursuit_evasion` |
+| `formation` | Agents following a leader in wedge/line/circle formations (press F to cycle) | `cargo run --manifest-path examples/Cargo.toml -p steering_example_formation` |
+| `crowd_simulation` | 32 agents navigating a space with reciprocal avoidance and obstacles | `cargo run --manifest-path examples/Cargo.toml -p steering_example_crowd_simulation` |
 | `steering_lab` | Crate-local BRP/E2E showcase | `cargo run -p steering_lab` |
 
 ## Crate-Local Lab

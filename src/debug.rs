@@ -25,6 +25,7 @@ pub(crate) fn draw_steering_debug(
         Option<&Arrive>,
         Option<&Wander>,
         Option<&PathFollowing>,
+        Option<&Containment>,
         Option<&SteeringDebugAgent>,
     )>,
     obstacles: Query<(&GlobalTransform, &SteeringObstacle)>,
@@ -38,6 +39,7 @@ pub(crate) fn draw_steering_debug(
         arrive,
         wander,
         path_following,
+        containment,
         debug_agent,
     ) in &agents
     {
@@ -155,6 +157,23 @@ pub(crate) fn draw_steering_debug(
                 for point in &path_following.path.points {
                     gizmos.cross(*point, 0.12, HOT_PINK);
                 }
+            }
+        }
+        if settings.draw_targets {
+            if let Some(slot) = diagnostics.formation_slot_position {
+                gizmos.cross(slot, 0.2, GOLD);
+                gizmos.line(position, slot, GOLD);
+            }
+        }
+        if let Some(containment) = containment {
+            if settings.draw_obstacles {
+                draw_plane_circle(
+                    &mut gizmos,
+                    agent.plane,
+                    containment.center,
+                    containment.radius,
+                    ORANGE,
+                );
             }
         }
     }

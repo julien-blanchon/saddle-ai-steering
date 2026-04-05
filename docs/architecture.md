@@ -106,6 +106,25 @@ The pipeline stays ECS-friendly:
 
 That keeps crowd motion additive and debuggable instead of introducing a separate movement mode or solver-owned transform stage.
 
+## Group Behaviors
+
+Three behaviors support organized group movement:
+
+- `LeaderFollowing`: arrives at a point behind a leader entity; evades sideways if ahead of the leader's forward cone
+- `Formation`: holds a slot position relative to an anchor entity, with the slot offset rotated by the anchor's velocity direction
+- `Containment`: steers back toward the center of a bounding sphere when approaching the boundary
+
+These compose naturally with the existing behaviors. A typical formation uses `Formation` + `ReciprocalAvoidance` + `ObstacleAvoidance` for followers, with the leader using `Wander` or `PathFollowing` + `Containment`.
+
+## Steering vs Navmesh
+
+This crate and `saddle-ai-navmesh` operate at different abstraction levels:
+
+- **Navmesh**: topology, global pathfinding, waypoint route computation
+- **Steering**: forces, velocities, local tactical behaviors
+
+They integrate cleanly: navmesh outputs a waypoint corridor, a sync system copies it into a `SteeringPath`, and steering handles local movement, avoidance, and flocking. Neither crate depends on the other — integration is user-level.
+
 ## Jitter and Oscillation Control
 
 The crate avoids common classical-steering failure modes with:
@@ -133,7 +152,7 @@ The plugin auto-inserts them when required. They stay public because they are us
 
 ### Expected complexity
 
-- seek, flee, arrive, pursue, evade, wander:
+- seek, flee, arrive, pursue, evade, wander, leader following, formation, containment:
   `O(agents)`
 - path following:
   `O(agents * path_lookahead_segments)` with small path-local scans

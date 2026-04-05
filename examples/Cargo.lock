@@ -5309,7 +5309,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "steering_example_crowd_simulation"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "saddle-ai-steering",
+ "saddle-pane",
+ "steering_example_support",
+]
+
+[[package]]
 name = "steering_example_flocking"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "saddle-ai-steering",
+ "saddle-pane",
+ "steering_example_support",
+]
+
+[[package]]
+name = "steering_example_formation"
 version = "0.1.0"
 dependencies = [
  "bevy",
@@ -5340,6 +5360,16 @@ dependencies = [
 
 [[package]]
 name = "steering_example_path_following"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "saddle-ai-steering",
+ "saddle-pane",
+ "steering_example_support",
+]
+
+[[package]]
+name = "steering_example_pursuit_evasion"
 version = "0.1.0"
 dependencies = [
  "bevy",

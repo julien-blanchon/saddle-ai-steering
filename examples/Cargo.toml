@@ -9,6 +9,9 @@ members = [
     "blended",
     "flocking",
     "kinematic_2d",
+    "pursuit_evasion",
+    "formation",
+    "crowd_simulation",
     "lab",
 ]
 resolver = "3"

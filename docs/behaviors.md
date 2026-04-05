@@ -111,6 +111,72 @@ Follows a waypoint path using waypoint tolerance and lookahead.
   too-small lookahead can pin agents to corners
   too-large lookahead can skip intended tight authored turns
 
+## `Flocking`
+
+Boids-style local group motion: separation, alignment, and cohesion around nearby agents.
+
+- Needs:
+  `Flocking` component, other `SteeringAgent` entities nearby
+- Key tuning:
+  `separation_weight`, `alignment_weight`, `cohesion_weight`, `max_neighbors`
+- Failure modes:
+  too-strong separation can fragment a group
+  too-strong cohesion can collapse agents into a single point
+- Typical use:
+  bird flocks, fish schools, drone swarms, ambient crowd life
+
+## `ReciprocalAvoidance`
+
+Lightweight agent-agent collision avoidance that deflects velocity based on predicted time-to-collision.
+
+- Needs:
+  `ReciprocalAvoidance` component, other `SteeringAgent` entities nearby
+- Key tuning:
+  `time_horizon`, `comfort_distance`, `side_bias`
+- Limits:
+  not a full ORCA solver; suitable for medium-density crowds
+- Composes well with:
+  `PathFollowing`, `Flocking`
+
+## `LeaderFollowing`
+
+Follow behind a leader entity. Arrives at a point `behind_distance` behind the leader's velocity direction. If the agent is ahead of the leader within `leader_sight_radius`, it evades sideways to clear the leader's path.
+
+- Needs:
+  `SteeringTarget` for the leader
+- Key tuning:
+  `behind_distance`, `leader_sight_radius`
+- Composes well with:
+  `ReciprocalAvoidance` (to avoid other followers), `ObstacleAvoidance`
+- Failure modes:
+  leader with no velocity (stationary) defaults to following behind along the Z axis
+
+## `Formation`
+
+Hold a slot position relative to an anchor entity. The `slot_offset` is defined in anchor-local space and rotated by the anchor's velocity direction each frame. Uses arrive behavior internally.
+
+- Needs:
+  `SteeringTarget` for the anchor, `slot_offset: Vec3`
+- Typical use:
+  military units, escort missions, NPC groups
+- Composes well with:
+  `ReciprocalAvoidance`, `ObstacleAvoidance`
+- Failure modes:
+  anchor with no velocity causes the slot orientation to default to the Z axis
+
+## `Containment`
+
+Keep agents within a bounding sphere. The behavior activates when the agent enters the margin zone and steers back toward the center with force proportional to proximity to the boundary.
+
+- Needs:
+  `center: Vec3`, `radius: f32`
+- Key tuning:
+  `margin` controls how early the behavior activates
+- Typical use:
+  arena boundaries, world edges, prevent agents from wandering off
+- Composes well with:
+  any behavior that might drive agents out of bounds (`Wander`, `Flee`, `Flocking`)
+
 ## Composition Guidance
 
 Recommended defaults:
@@ -125,6 +191,12 @@ Recommended defaults:
   `PathFollowing`
 - Ambient life:
   `Wander`
+- Predator-prey:
+  `Pursue` + `ObstacleAvoidance` + `Containment` for predators, `Evade` + `Wander` + `ObstacleAvoidance` + `Containment` for prey
+- Formation movement:
+  `Formation` + `ReciprocalAvoidance` + `ObstacleAvoidance` for followers, `Wander` + `ObstacleAvoidance` + `Containment` for the leader
+- Crowd navigation:
+  `PathFollowing` + `ReciprocalAvoidance` + `ObstacleAvoidance` + `Containment`
 
 When multiple behaviors are active:
 
