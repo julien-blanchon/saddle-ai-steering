@@ -76,7 +76,7 @@ For apps where steering should stay active for the entire app lifetime, `Steerin
 
 - Plugin: `SteeringPlugin`
 - System sets:
-  `SteeringSystems::{Gather, Evaluate, Apply, Debug}`
+  `SteeringSystems::{Gather, EvaluateCustom, Evaluate, Apply, Debug}`
 - Core agent components:
   `SteeringAgent`, `SteeringKinematics`, `SteeringOutput`, `SteeringDiagnostics`
 - Optional application helpers:
@@ -86,6 +86,8 @@ For apps where steering should stay active for the entire app lifetime, `Steerin
   `SteeringPlane`, `SteeringComposition`, `SteeringLayerMask`
 - Behavior components:
   `Seek`, `Flee`, `Arrive`, `Pursue`, `Evade`, `Wander`, `ObstacleAvoidance`, `PathFollowing`, `Flocking`, `ReciprocalAvoidance`, `LeaderFollowing`, `Formation`, `Containment`
+- Custom behavior support:
+  `CustomSteeringBehavior`, `CustomContribution`, `LinearIntent`, `desired_velocity_intent`, `clamp_magnitude`, `predict_target_position`
 - Behavior runtime state:
   `WanderState`, `PathFollowingState`
 - Debug resources:
@@ -108,6 +110,91 @@ For apps where steering should stay active for the entire app lifetime, `Steerin
 | `LeaderFollowing` | Follow behind a leader entity | `leader`, `behind_distance`, `leader_sight_radius` | Arrives at a point behind the leader; evades sideways if ahead of the leader's forward cone |
 | `Formation` | Hold a slot relative to an anchor | `anchor`, `slot_offset` | Anchor-local offset is rotated by anchor's velocity direction; uses arrive for positioning |
 | `Containment` | Stay within a bounding region | `center`, `radius`, `margin` | Steers back toward center when approaching the boundary, with force scaling by proximity |
+
+## Custom Behaviors
+
+You can define your own steering behaviors outside the crate. Custom behaviors participate fully in the composition pipeline (weighted blend or prioritized accumulation) alongside built-in behaviors, and appear in `SteeringDiagnostics`.
+
+### How it works
+
+1. **Define a component** for your behavior's configuration (this lives in your code).
+2. **Write an evaluate system** that reads agent state, computes a `LinearIntent`, and pushes it into the `CustomSteeringBehavior` inbox.
+3. **Register the system** in `SteeringSystems::EvaluateCustom`.
+
+```rust,ignore
+use bevy::prelude::*;
+use saddle_ai_steering::{
+    BehaviorTuning, CustomSteeringBehavior, SteeringAgent, SteeringAutoApply,
+    SteeringKinematics, SteeringPlane, SteeringSystems, desired_velocity_intent,
+};
+
+// 1. Your behavior component
+#[derive(Component)]
+struct OrbitBehavior {
+    center: Vec3,
+    radius: f32,
+    speed: f32,
+    tuning: BehaviorTuning,
+}
+
+// 2. Your evaluate system
+fn evaluate_orbit(
+    mut agents: Query<(
+        &SteeringAgent,
+        &GlobalTransform,
+        &SteeringKinematics,
+        &OrbitBehavior,
+        &mut CustomSteeringBehavior,
+    )>,
+) {
+    for (agent, transform, kinematics, orbit, mut custom) in &mut agents {
+        let position = agent.plane.project_vector(transform.translation());
+        let to_center = orbit.center - position;
+        let distance = to_center.length();
+        if distance < 0.01 { continue; }
+
+        let radial = to_center / distance;
+        let tangent = Vec3::new(-radial.z, 0.0, radial.x);
+        let correction = radial * (distance - orbit.radius) * 2.0;
+        let desired_vel = (tangent * orbit.speed + correction).normalize_or_zero() * orbit.speed;
+
+        let intent = desired_velocity_intent(
+            desired_vel, kinematics.linear_velocity,
+            agent.plane, agent.max_acceleration,
+        );
+        custom.push("Orbit", orbit.tuning, intent);
+    }
+}
+
+// 3. Register
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .add_plugins(saddle_ai_steering::SteeringPlugin::default())
+        .add_systems(Update, evaluate_orbit.in_set(SteeringSystems::EvaluateCustom))
+        .add_systems(Startup, |mut commands: Commands| {
+            commands.spawn((
+                SteeringAgent::new(SteeringPlane::XZ).with_max_speed(4.0),
+                SteeringAutoApply::default(),
+                CustomSteeringBehavior::default(),
+                OrbitBehavior { center: Vec3::ZERO, radius: 5.0, speed: 3.5,
+                    tuning: BehaviorTuning::new(1.0, 40) },
+                Transform::from_xyz(5.0, 0.5, 0.0),
+            ));
+        })
+        .run();
+}
+```
+
+### Available helpers
+
+| Function | Purpose |
+| --- | --- |
+| `desired_velocity_intent(desired_vel, current_vel, plane, max_accel)` | Convert a desired velocity into a `LinearIntent` — the most common pattern |
+| `clamp_magnitude(vec, max_length)` | Clamp a vector's magnitude |
+| `predict_target_position(...)` | Predict where a moving target will be — useful for pursuit-like custom behaviors |
+
+Custom behaviors compose with built-in ones. You can add `Seek`, `ObstacleAvoidance`, and your custom `Orbit` on the same entity and they will all participate in the agent's `SteeringComposition`.
 
 ## Steering vs Navmesh
 
@@ -166,24 +253,43 @@ Full parameter reference:
 | `pursuit_evasion` | Predator-prey chase with obstacle avoidance and containment | `cargo run --manifest-path examples/Cargo.toml -p steering_example_pursuit_evasion` |
 | `formation` | Agents following a leader in wedge/line/circle formations (press F to cycle) | `cargo run --manifest-path examples/Cargo.toml -p steering_example_formation` |
 | `crowd_simulation` | 32 agents navigating a space with reciprocal avoidance and obstacles | `cargo run --manifest-path examples/Cargo.toml -p steering_example_crowd_simulation` |
+| `custom_behavior` | User-defined orbit behavior via `CustomSteeringBehavior` | `cargo run --manifest-path examples/Cargo.toml -p steering_example_custom_behavior` |
 | `steering_lab` | Crate-local BRP/E2E showcase | `cargo run -p steering_lab` |
 
 ## Crate-Local Lab
 
-`shared/ai/steering/examples/lab` is the verification app for this crate.
+`shared/ai/steering/examples/lab` is the verification app for this crate. It exercises all behaviors — including custom behaviors — in one scene with live diagnostics.
 
 ```bash
 cargo run --manifest-path examples/Cargo.toml -p steering_lab
 ```
 
-E2E commands:
+### E2E Scenarios
+
+Each scenario runs deterministic 60fps simulation, asserts behavioral metrics via `LabDiagnostics`, and captures screenshots to `e2e_output/<scenario>/`.
+
+| Scenario | What it verifies | Assertions |
+| --- | --- | --- |
+| `smoke_launch` | App boots, all agents active | `active_agents >= 9` |
+| `steering_smoke` | Core behaviors run together | Pursuit closing, wander moving, path advancing |
+| `steering_path_following` | Path follower completes laps | Waypoint progress after 490 frames |
+| `steering_avoidance` | Obstacle avoidance clearance | Agent clears obstacle with `clearance > 0.05` |
+| `steering_flocking_crowd` | Flocking + reciprocal avoidance | Neighbors detected, conflicts resolved, `separation > 0.2` |
+| `steering_custom_behavior` | Custom orbit behavior | Agent moving, maintains orbit speed, converges to target radius |
+
+Run all scenarios:
 
 ```bash
-cargo run --manifest-path examples/Cargo.toml -p steering_lab --features e2e -- smoke_launch
-cargo run --manifest-path examples/Cargo.toml -p steering_lab --features e2e -- steering_smoke
-cargo run --manifest-path examples/Cargo.toml -p steering_lab --features e2e -- steering_path_following
-cargo run --manifest-path examples/Cargo.toml -p steering_lab --features e2e -- steering_avoidance
+cd examples
+cargo run -p steering_lab --features e2e -- smoke_launch
+cargo run -p steering_lab --features e2e -- steering_smoke
+cargo run -p steering_lab --features e2e -- steering_path_following
+cargo run -p steering_lab --features e2e -- steering_avoidance
+cargo run -p steering_lab --features e2e -- steering_flocking_crowd
+cargo run -p steering_lab --features e2e -- steering_custom_behavior
 ```
+
+Add `--handoff` to keep the window open after the scenario finishes (useful for BRP inspection).
 
 ## Limitations
 

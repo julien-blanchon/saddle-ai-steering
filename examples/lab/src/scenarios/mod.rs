@@ -9,6 +9,7 @@ pub fn list_scenarios() -> Vec<&'static str> {
         "steering_path_following",
         "steering_avoidance",
         "steering_flocking_crowd",
+        "steering_custom_behavior",
     ]
 }
 
@@ -19,6 +20,7 @@ pub fn scenario_by_name(name: &str) -> Option<Scenario> {
         "steering_path_following" => Some(steering_path_following()),
         "steering_avoidance" => Some(steering_avoidance()),
         "steering_flocking_crowd" => Some(steering_flocking_crowd()),
+        "steering_custom_behavior" => Some(steering_custom_behavior()),
         _ => None,
     }
 }
@@ -30,8 +32,8 @@ fn smoke_launch() -> Scenario {
         )
         .then(Action::WaitFrames(12))
         .then(assertions::resource_satisfies::<LabDiagnostics>(
-            "the showcase plus crowd agents are active at launch",
-            |diagnostics| diagnostics.active_agents >= 8,
+            "the showcase plus crowd agents plus custom orbit are active at launch",
+            |diagnostics| diagnostics.active_agents >= 9,
         ))
         .then(Action::Screenshot("overview".into()))
         .then(Action::WaitFrames(1))
@@ -126,5 +128,32 @@ fn steering_flocking_crowd() -> Scenario {
         .then(Action::Screenshot("crowd_mid".into()))
         .then(Action::WaitFrames(1))
         .then(assertions::log_summary("steering_flocking_crowd"))
+        .build()
+}
+
+fn steering_custom_behavior() -> Scenario {
+    Scenario::builder("steering_custom_behavior")
+        .description(
+            "Verify the custom orbit behavior: agent reaches orbit speed, maintains radius, and converges to the target orbit within tolerance.",
+        )
+        .then(Action::WaitFrames(30))
+        .then(Action::Screenshot("custom_orbit_start".into()))
+        .then(Action::WaitFrames(1))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "custom orbit agent is moving",
+            |diagnostics| diagnostics.custom_orbit_speed > 0.5,
+        ))
+        .then(Action::WaitFrames(300))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "custom orbit agent maintains orbit speed",
+            |diagnostics| diagnostics.custom_orbit_speed > 1.0,
+        ))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "custom orbit agent converged near target radius",
+            |diagnostics| diagnostics.custom_orbit_min_radius_error < 1.5,
+        ))
+        .then(Action::Screenshot("custom_orbit_settled".into()))
+        .then(Action::WaitFrames(1))
+        .then(assertions::log_summary("steering_custom_behavior"))
         .build()
 }

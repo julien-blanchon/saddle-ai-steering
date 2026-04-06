@@ -1,3 +1,4 @@
+use crate::math::LinearIntent;
 use bevy::prelude::*;
 
 #[derive(Reflect, Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
@@ -77,7 +78,7 @@ pub enum SteeringFacingMode {
     DesiredHeading,
 }
 
-#[derive(Reflect, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Reflect, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum SteeringBehaviorKind {
     Seek,
     Flee,
@@ -93,6 +94,7 @@ pub enum SteeringBehaviorKind {
     Formation,
     Containment,
     Brake,
+    Custom(String),
 }
 
 #[derive(Reflect, Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
@@ -748,5 +750,75 @@ impl Containment {
     pub fn with_margin(mut self, margin: f32) -> Self {
         self.margin = margin;
         self
+    }
+}
+
+/// A single contribution from a user-defined custom steering behavior.
+#[derive(Reflect, Clone, Debug)]
+pub struct CustomContribution {
+    pub name: String,
+    pub tuning: BehaviorTuning,
+    pub intent: LinearIntent,
+}
+
+/// Inbox for custom steering contributions.
+///
+/// Add this component to any entity with [`SteeringAgent`] to inject forces from
+/// user-defined behaviors into the composition pipeline. Write contributions in a
+/// system placed in [`SteeringSystems::EvaluateCustom`](crate::SteeringSystems::EvaluateCustom),
+/// and they will be blended alongside built-in behaviors.
+///
+/// The inbox is cleared automatically each frame before custom systems run.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// fn my_behavior(
+///     mut agents: Query<(
+///         &SteeringAgent,
+///         &GlobalTransform,
+///         &SteeringKinematics,
+///         &mut CustomSteeringBehavior,
+///     )>,
+/// ) {
+///     for (agent, transform, kinematics, mut custom) in &mut agents {
+///         let desired_velocity = Vec3::new(1.0, 0.0, 0.0) * agent.max_speed;
+///         let intent = desired_velocity_intent(
+///             desired_velocity,
+///             kinematics.linear_velocity,
+///             agent.plane,
+///             agent.max_acceleration,
+///         );
+///         custom.push("MyBehavior", BehaviorTuning::default(), intent);
+///     }
+/// }
+///
+/// // Register in EvaluateCustom so it runs before the built-in evaluate pass:
+/// app.add_systems(Update, my_behavior.in_set(SteeringSystems::EvaluateCustom));
+/// ```
+#[derive(Component, Reflect, Clone, Debug, Default)]
+#[reflect(Component)]
+pub struct CustomSteeringBehavior {
+    pub contributions: Vec<CustomContribution>,
+}
+
+impl CustomSteeringBehavior {
+    /// Push a custom contribution into the inbox.
+    pub fn push(
+        &mut self,
+        name: impl Into<String>,
+        tuning: BehaviorTuning,
+        intent: LinearIntent,
+    ) {
+        self.contributions.push(CustomContribution {
+            name: name.into(),
+            tuning,
+            intent,
+        });
+    }
+
+    /// Remove all contributions (called automatically at the start of each frame).
+    pub fn clear(&mut self) {
+        self.contributions.clear();
     }
 }

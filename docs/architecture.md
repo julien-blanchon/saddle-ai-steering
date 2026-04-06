@@ -171,6 +171,36 @@ If a consumer needs larger-scale obstacle counts, the recommended extension is:
 2. keep `steering` as the final intent stage
 3. feed only nearby obstacles into the avoidance step
 
+## Custom Behaviors
+
+Users can define their own behaviors outside the crate using the `CustomSteeringBehavior` inbox pattern:
+
+### Pipeline
+
+```
+Gather → EvaluateCustom → Evaluate → Apply → Debug
+```
+
+1. `EvaluateCustom` runs first: the inbox is cleared, then user systems execute and push `CustomContribution` entries into `CustomSteeringBehavior`.
+2. `Evaluate` runs: `evaluate_agents` reads both built-in behavior components and the custom inbox, merges all contributions, and applies the composition policy.
+
+### What's public
+
+| Item | Purpose |
+| --- | --- |
+| `LinearIntent` | The fundamental output type (desired velocity + acceleration) |
+| `desired_velocity_intent()` | Convert a desired velocity into a `LinearIntent` (most common pattern) |
+| `clamp_magnitude()` | Clamp a vector's magnitude |
+| `predict_target_position()` | Predict where a moving target will be |
+| `CustomSteeringBehavior` | Component inbox for custom contributions |
+| `CustomContribution` | A named contribution with tuning and intent |
+| `SteeringBehaviorKind::Custom(String)` | Appears in `SteeringDiagnostics` |
+| `SteeringSystems::EvaluateCustom` | System set where custom evaluate systems run |
+
+### Design rationale
+
+Custom behaviors follow the same inbox/contribution pattern as built-in behaviors. They compose through the same weighted-blend or prioritized-accumulation pipeline, appear in the same `SteeringDiagnostics`, and can coexist with any built-in behavior on the same entity. This avoids trait-based registration, keeps the system pipeline deterministic, and requires no changes to the crate when adding new behaviors.
+
 ## Extension Points
 
 The design leaves room for future work without breaking the core API:

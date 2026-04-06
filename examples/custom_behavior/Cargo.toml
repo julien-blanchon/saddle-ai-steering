@@ -1,0 +1,14 @@
+[package]
+name = "steering_example_custom_behavior"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+bevy = { workspace = true }
+saddle-pane = { workspace = true }
+steering = { workspace = true }
+steering_example_support = { path = "../support" }
+
+[lints]
+workspace = true

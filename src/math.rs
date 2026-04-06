@@ -6,8 +6,8 @@ use bevy::prelude::*;
 
 pub(crate) const STEERING_EPSILON: f32 = 1.0e-4;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub(crate) struct LinearIntent {
+#[derive(Clone, Copy, Debug, Default, PartialEq, Reflect)]
+pub struct LinearIntent {
     pub desired_velocity: Vec3,
     pub linear_acceleration: Vec3,
 }
@@ -23,7 +23,7 @@ impl LinearIntent {
     }
 }
 
-pub(crate) fn clamp_magnitude(value: Vec3, max_length: f32) -> Vec3 {
+pub fn clamp_magnitude(value: Vec3, max_length: f32) -> Vec3 {
     if max_length <= 0.0 {
         return Vec3::ZERO;
     }
@@ -35,7 +35,7 @@ pub(crate) fn clamp_magnitude(value: Vec3, max_length: f32) -> Vec3 {
     }
 }
 
-pub(crate) fn desired_velocity_intent(
+pub fn desired_velocity_intent(
     desired_velocity: Vec3,
     current_velocity: Vec3,
     plane: SteeringPlane,
@@ -68,7 +68,7 @@ pub(crate) fn braking_intent(
     }
 }
 
-pub(crate) fn predict_target_position(
+pub fn predict_target_position(
     agent_position: Vec3,
     target_position: Vec3,
     target_velocity: Vec3,
@@ -201,7 +201,7 @@ pub(crate) fn dominant_behavior(
                 .total_cmp(&right.applied_acceleration.length_squared())
                 .then_with(|| right.priority.cmp(&left.priority))
         })
-        .map(|contribution| contribution.behavior)
+        .map(|contribution| contribution.behavior.clone())
 }
 
 pub(crate) fn desired_facing(

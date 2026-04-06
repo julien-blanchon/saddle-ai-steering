@@ -8,10 +8,11 @@ use bevy::prelude::*;
 use bevy_brp_extras::BrpExtrasPlugin;
 use saddle_pane::prelude::*;
 use steering::{
-    Arrive, Flocking, ObstacleAvoidance, PathFollowing, PathFollowingState, Pursue,
-    ReciprocalAvoidance, Seek, SteeringAgent, SteeringAutoApply, SteeringDebugSettings,
-    SteeringDiagnostics, SteeringKinematics, SteeringObstacle, SteeringObstacleShape, SteeringPath,
-    SteeringPlane, SteeringTarget, SteeringTrackedVelocity, Wander,
+    Arrive, BehaviorTuning, CustomSteeringBehavior, Flocking, ObstacleAvoidance, PathFollowing,
+    PathFollowingState, Pursue, ReciprocalAvoidance, Seek, SteeringAgent, SteeringAutoApply,
+    SteeringDebugSettings, SteeringDiagnostics, SteeringKinematics, SteeringObstacle,
+    SteeringObstacleShape, SteeringPath, SteeringPlane, SteeringSystems, SteeringTarget,
+    SteeringTrackedVelocity, Wander, desired_velocity_intent,
 };
 use steering_example_support as support;
 
@@ -37,6 +38,9 @@ struct OrbitTarget;
 struct CrowdAgent;
 
 #[derive(Component)]
+struct CustomOrbitAgent;
+
+#[derive(Component)]
 struct MainObstacle;
 
 #[derive(Component)]
@@ -47,6 +51,15 @@ struct OrbitMotion {
     center: Vec3,
     radius: f32,
     speed: f32,
+}
+
+#[derive(Component, Clone, Copy, Debug)]
+struct CustomOrbitBehavior {
+    center: Vec3,
+    radius: f32,
+    speed: f32,
+    correction_strength: f32,
+    tuning: BehaviorTuning,
 }
 
 #[derive(Resource, Reflect, Clone, Debug)]
@@ -64,6 +77,10 @@ pub struct LabDiagnostics {
     pub crowd_peak_neighbors: usize,
     pub crowd_conflict_frames: u32,
     pub crowd_min_separation: f32,
+    pub custom_orbit_speed: f32,
+    pub custom_orbit_distance_to_center: f32,
+    pub custom_orbit_min_radius_error: f32,
+    pub custom_orbit_max_radius_error: f32,
 }
 
 impl Default for LabDiagnostics {
@@ -81,6 +98,10 @@ impl Default for LabDiagnostics {
             crowd_peak_neighbors: 0,
             crowd_conflict_frames: 0,
             crowd_min_separation: f32::MAX,
+            custom_orbit_speed: 0.0,
+            custom_orbit_distance_to_center: 0.0,
+            custom_orbit_min_radius_error: f32::MAX,
+            custom_orbit_max_radius_error: 0.0,
         }
     }
 }
@@ -130,6 +151,10 @@ fn main() {
     .register_pane::<support::SteeringExamplePane>();
     app.add_plugins(steering::SteeringPlugin::default());
     app.add_systems(Startup, setup);
+    app.add_systems(
+        Update,
+        evaluate_custom_orbit.in_set(SteeringSystems::EvaluateCustom),
+    );
     app.add_systems(
         Update,
         (
@@ -438,6 +463,39 @@ fn setup(
             ReciprocalAvoidance::default(),
         ));
     }
+
+    let orbit_center = Vec3::new(6.0, 0.6, 6.0);
+    spawn_marker(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        "Custom Orbit Center",
+        Color::srgb(0.52, 0.96, 0.62),
+        orbit_center,
+    );
+    let custom_orbit = spawn_agent(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        "Custom Orbit Agent",
+        Color::srgb(0.42, 0.96, 0.52),
+        Transform::from_xyz(9.5, 0.6, 6.0),
+    );
+    commands.entity(custom_orbit).insert((
+        CustomOrbitAgent,
+        SteeringAgent::new(SteeringPlane::XZ)
+            .with_max_speed(4.5)
+            .with_max_acceleration(11.0),
+        SteeringAutoApply::default(),
+        CustomSteeringBehavior::default(),
+        CustomOrbitBehavior {
+            center: orbit_center,
+            radius: 3.5,
+            speed: 3.8,
+            correction_strength: 2.5,
+            tuning: BehaviorTuning::new(1.0, 40),
+        },
+    ));
 }
 
 fn spawn_agent(
@@ -508,6 +566,44 @@ fn spawn_obstacle(
         entity.insert(MainObstacle);
     }
     entity.id()
+}
+
+fn evaluate_custom_orbit(
+    mut agents: Query<(
+        &SteeringAgent,
+        &GlobalTransform,
+        &SteeringKinematics,
+        &CustomOrbitBehavior,
+        &mut CustomSteeringBehavior,
+    )>,
+) {
+    for (agent, global_transform, kinematics, orbit, mut custom) in &mut agents {
+        let position = agent.plane.project_vector(global_transform.translation());
+        let center = agent.plane.project_vector(orbit.center);
+        let to_center = center - position;
+        let distance = to_center.length();
+
+        if distance < 0.01 {
+            continue;
+        }
+
+        let radial = to_center / distance;
+        let tangent = Vec3::new(-radial.z, 0.0, radial.x);
+
+        let radius_error = distance - orbit.radius;
+        let correction = radial * radius_error * orbit.correction_strength;
+
+        let desired_velocity =
+            (tangent * orbit.speed + correction).normalize_or_zero() * orbit.speed;
+
+        let intent = desired_velocity_intent(
+            desired_velocity,
+            kinematics.linear_velocity,
+            agent.plane,
+            agent.max_acceleration,
+        );
+        custom.push("Orbit", orbit.tuning, intent);
+    }
 }
 
 fn orbit_targets(
@@ -617,6 +713,10 @@ fn update_lab_diagnostics(
     wander_agent: Query<&SteeringKinematics, With<WanderAgent>>,
     main_obstacle: Query<(&Transform, &SteeringObstacle), With<MainObstacle>>,
     crowd_agents: Query<(&Transform, &SteeringDiagnostics), With<CrowdAgent>>,
+    custom_orbit_agent: Query<
+        (&Transform, &SteeringKinematics, &CustomOrbitBehavior),
+        With<CustomOrbitAgent>,
+    >,
 ) {
     diagnostics.active_agents = outputs
         .iter()
@@ -691,6 +791,23 @@ fn update_lab_diagnostics(
             }
         }
     }
+
+    if let Ok((transform, kinematics, orbit)) = custom_orbit_agent.single() {
+        let position = Vec3::new(
+            transform.translation.x,
+            0.0,
+            transform.translation.z,
+        );
+        let center = Vec3::new(orbit.center.x, 0.0, orbit.center.z);
+        let distance = position.distance(center);
+        let radius_error = (distance - orbit.radius).abs();
+        diagnostics.custom_orbit_speed = kinematics.linear_velocity.length();
+        diagnostics.custom_orbit_distance_to_center = distance;
+        diagnostics.custom_orbit_min_radius_error =
+            diagnostics.custom_orbit_min_radius_error.min(radius_error);
+        diagnostics.custom_orbit_max_radius_error =
+            diagnostics.custom_orbit_max_radius_error.max(radius_error);
+    }
 }
 
 fn update_overlay(
@@ -714,6 +831,8 @@ crowd flock peak: {}\n\
 crowd neighbors peak: {}\n\
 crowd conflict frames: {}\n\
 crowd min separation: {:.2}\n\
+custom orbit speed: {:.2}\n\
+custom orbit dist: {:.2} (err: {:.2}–{:.2})\n\
 debug gizmos: {} (Tab)",
         diagnostics.active_agents,
         diagnostics.path_waypoint,
@@ -726,6 +845,10 @@ debug gizmos: {} (Tab)",
         diagnostics.crowd_peak_neighbors,
         diagnostics.crowd_conflict_frames,
         diagnostics.crowd_min_separation,
+        diagnostics.custom_orbit_speed,
+        diagnostics.custom_orbit_distance_to_center,
+        diagnostics.custom_orbit_min_radius_error,
+        diagnostics.custom_orbit_max_radius_error,
         if debug.enabled { "on" } else { "off" },
     )
     .into();

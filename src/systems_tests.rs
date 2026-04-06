@@ -60,6 +60,10 @@ fn steering_sets_chain_in_expected_order() {
     app.add_plugins(SteeringPlugin::default())
         .init_resource::<OrderLog>()
         .add_systems(Update, record_gather.in_set(SteeringSystems::Gather))
+        .add_systems(
+            Update,
+            record_evaluate_custom.in_set(SteeringSystems::EvaluateCustom),
+        )
         .add_systems(Update, record_evaluate.in_set(SteeringSystems::Evaluate))
         .add_systems(Update, record_apply.in_set(SteeringSystems::Apply))
         .add_systems(Update, record_debug.in_set(SteeringSystems::Debug));
@@ -67,7 +71,10 @@ fn steering_sets_chain_in_expected_order() {
     app.update();
 
     let log = &app.world().resource::<OrderLog>().0;
-    assert_eq!(log, &["gather", "evaluate", "apply", "debug"]);
+    assert_eq!(
+        log,
+        &["gather", "evaluate_custom", "evaluate", "apply", "debug"]
+    );
 }
 
 #[test]
@@ -272,6 +279,10 @@ fn record_gather(mut log: ResMut<OrderLog>) {
     log.0.push("gather");
 }
 
+fn record_evaluate_custom(mut log: ResMut<OrderLog>) {
+    log.0.push("evaluate_custom");
+}
+
 fn record_evaluate(mut log: ResMut<OrderLog>) {
     log.0.push("evaluate");
 }
@@ -282,4 +293,62 @@ fn record_apply(mut log: ResMut<OrderLog>) {
 
 fn record_debug(mut log: ResMut<OrderLog>) {
     log.0.push("debug");
+}
+
+#[test]
+fn custom_behavior_contributes_to_output() {
+    let mut app = make_test_app();
+    app.add_plugins(SteeringPlugin::default());
+
+    // A custom system that pushes a rightward force via CustomSteeringBehavior.
+    fn push_custom(
+        mut agents: Query<(
+            &SteeringAgent,
+            &SteeringKinematics,
+            &mut CustomSteeringBehavior,
+        )>,
+    ) {
+        for (agent, kinematics, mut custom) in &mut agents {
+            let desired_velocity = Vec3::new(agent.max_speed, 0.0, 0.0);
+            let intent = crate::math::desired_velocity_intent(
+                desired_velocity,
+                kinematics.linear_velocity,
+                agent.plane,
+                agent.max_acceleration,
+            );
+            custom.push("TestCustom", BehaviorTuning::new(1.0, 30), intent);
+        }
+    }
+
+    app.add_systems(Update, push_custom.in_set(SteeringSystems::EvaluateCustom));
+
+    let entity = app
+        .world_mut()
+        .spawn((
+            SteeringAgent::default(),
+            SteeringAutoApply::default(),
+            CustomSteeringBehavior::default(),
+            Transform::default(),
+            GlobalTransform::default(),
+        ))
+        .id();
+
+    app.update();
+
+    let output = app
+        .world()
+        .entity(entity)
+        .get::<SteeringOutput>()
+        .expect("output should exist");
+    assert!(output.desired_velocity.x > 0.5, "custom behavior should produce rightward velocity");
+
+    let diagnostics = app
+        .world()
+        .entity(entity)
+        .get::<SteeringDiagnostics>()
+        .expect("diagnostics should exist");
+    assert_eq!(
+        diagnostics.dominant_behavior,
+        Some(SteeringBehaviorKind::Custom("TestCustom".into())),
+    );
 }

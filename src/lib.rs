@@ -8,15 +8,19 @@ mod resources;
 mod systems;
 
 pub use crate::components::{
-    Arrive, BehaviorTuning, Containment, Evade, Flee, Flocking, Formation, LeaderFollowing,
-    ObstacleAvoidance, PathFollowing, PathFollowingState, Pursue, ReciprocalAvoidance, Seek,
-    SteeringAgent, SteeringAlignment, SteeringAutoApply, SteeringBehaviorKind, SteeringComposition,
-    SteeringContribution, SteeringDebugAgent, SteeringDiagnostics, SteeringFacingMode,
-    SteeringKinematics, SteeringLayerMask, SteeringObstacle, SteeringObstacleShape, SteeringOutput,
-    SteeringPath, SteeringPathMode, SteeringPlane, SteeringTarget, SteeringTrackedVelocity,
-    SteeringVelocitySource, Wander, WanderState,
+    Arrive, BehaviorTuning, Containment, CustomContribution, CustomSteeringBehavior, Evade, Flee,
+    Flocking, Formation, LeaderFollowing, ObstacleAvoidance, PathFollowing, PathFollowingState,
+    Pursue, ReciprocalAvoidance, Seek, SteeringAgent, SteeringAlignment, SteeringAutoApply,
+    SteeringBehaviorKind, SteeringComposition, SteeringContribution, SteeringDebugAgent,
+    SteeringDiagnostics, SteeringFacingMode, SteeringKinematics, SteeringLayerMask,
+    SteeringObstacle, SteeringObstacleShape, SteeringOutput, SteeringPath, SteeringPathMode,
+    SteeringPlane, SteeringTarget, SteeringTrackedVelocity, SteeringVelocitySource, Wander,
+    WanderState,
 };
 pub use crate::debug::SteeringDebugGizmos;
+pub use crate::math::{
+    clamp_magnitude, desired_velocity_intent, predict_target_position, LinearIntent,
+};
 pub use crate::resources::{SteeringDebugSettings, SteeringStats};
 
 use bevy::{
@@ -28,6 +32,12 @@ use bevy::{
 #[derive(SystemSet, Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum SteeringSystems {
     Gather,
+    /// Runs after [`Gather`](SteeringSystems::Gather) and before
+    /// [`Evaluate`](SteeringSystems::Evaluate).
+    /// Place custom behavior systems here — they should write into
+    /// [`CustomSteeringBehavior`] and will be composed alongside built-in
+    /// behaviors.
+    EvaluateCustom,
     Evaluate,
     Apply,
     Debug,
@@ -114,10 +124,14 @@ impl Plugin for SteeringPlugin {
             .register_type::<SteeringVelocitySource>()
             .register_type::<Wander>()
             .register_type::<WanderState>()
+            .register_type::<CustomSteeringBehavior>()
+            .register_type::<CustomContribution>()
+            .register_type::<LinearIntent>()
             .configure_sets(
                 self.update_schedule,
                 (
                     SteeringSystems::Gather,
+                    SteeringSystems::EvaluateCustom,
                     SteeringSystems::Evaluate,
                     SteeringSystems::Apply,
                     SteeringSystems::Debug,
@@ -134,6 +148,12 @@ impl Plugin for SteeringPlugin {
                 )
                     .chain()
                     .in_set(SteeringSystems::Gather)
+                    .run_if(systems::runtime_is_active),
+            )
+            .add_systems(
+                self.update_schedule,
+                systems::clear_custom_behaviors
+                    .in_set(SteeringSystems::EvaluateCustom)
                     .run_if(systems::runtime_is_active),
             )
             .add_systems(

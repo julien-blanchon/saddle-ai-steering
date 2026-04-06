@@ -5319,6 +5319,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "steering_example_custom_behavior"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "saddle-ai-steering",
+ "saddle-pane",
+ "steering_example_support",
+]
+
+[[package]]
 name = "steering_example_flocking"
 version = "0.1.0"
 dependencies = [

@@ -130,6 +130,15 @@ pub(crate) fn refresh_tracked_kinematics(
 const STEERING_MIN_DT: f32 = 1.0 / 480.0;
 
 #[allow(clippy::too_many_arguments)]
+pub(crate) fn clear_custom_behaviors(
+    mut customs: Query<&mut CustomSteeringBehavior>,
+) {
+    for mut custom in &mut customs {
+        custom.clear();
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn evaluate_agents(
     time: Res<Time>,
     mut stats: ResMut<SteeringStats>,
@@ -156,6 +165,7 @@ pub(crate) fn evaluate_agents(
             Option<&Formation>,
             Option<&Containment>,
         ),
+        Option<&CustomSteeringBehavior>,
     )>,
     mut wander_states: Query<&mut WanderState>,
     mut path_states: Query<&mut PathFollowingState>,
@@ -175,7 +185,7 @@ pub(crate) fn evaluate_agents(
     let crowd_neighbors = agents
         .iter()
         .map(
-            |(entity, agent, _transform, global_transform, kinematics, _, _)| CrowdNeighbor {
+            |(entity, agent, _transform, global_transform, kinematics, _, _, _)| CrowdNeighbor {
                 entity,
                 position: global_transform.translation(),
                 velocity: kinematics.linear_velocity,
@@ -202,6 +212,7 @@ pub(crate) fn evaluate_agents(
             formation,
             containment,
         ),
+        custom_behavior,
     ) in &agents
     {
         stats.evaluated_agents += 1;
@@ -509,6 +520,17 @@ pub(crate) fn evaluate_agents(
                     SteeringBehaviorKind::Containment,
                     containment.tuning,
                     intent,
+                );
+            }
+        }
+
+        if let Some(custom) = custom_behavior {
+            for contribution in &custom.contributions {
+                push_contribution(
+                    &mut contributions,
+                    SteeringBehaviorKind::Custom(contribution.name.clone()),
+                    contribution.tuning,
+                    contribution.intent,
                 );
             }
         }

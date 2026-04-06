@@ -12,6 +12,7 @@ members = [
     "pursuit_evasion",
     "formation",
     "crowd_simulation",
+    "custom_behavior",
     "lab",
 ]
 resolver = "3"
