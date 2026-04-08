@@ -340,7 +340,10 @@ fn custom_behavior_contributes_to_output() {
         .entity(entity)
         .get::<SteeringOutput>()
         .expect("output should exist");
-    assert!(output.desired_velocity.x > 0.5, "custom behavior should produce rightward velocity");
+    assert!(
+        output.desired_velocity.x > 0.5,
+        "custom behavior should produce rightward velocity"
+    );
 
     let diagnostics = app
         .world()

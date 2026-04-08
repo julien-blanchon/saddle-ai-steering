@@ -19,7 +19,7 @@ pub use crate::components::{
 };
 pub use crate::debug::SteeringDebugGizmos;
 pub use crate::math::{
-    clamp_magnitude, desired_velocity_intent, predict_target_position, LinearIntent,
+    LinearIntent, clamp_magnitude, desired_velocity_intent, predict_target_position,
 };
 pub use crate::resources::{SteeringDebugSettings, SteeringStats};
 

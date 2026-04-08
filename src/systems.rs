@@ -130,9 +130,7 @@ pub(crate) fn refresh_tracked_kinematics(
 const STEERING_MIN_DT: f32 = 1.0 / 480.0;
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn clear_custom_behaviors(
-    mut customs: Query<&mut CustomSteeringBehavior>,
-) {
+pub(crate) fn clear_custom_behaviors(mut customs: Query<&mut CustomSteeringBehavior>) {
     for mut custom in &mut customs {
         custom.clear();
     }

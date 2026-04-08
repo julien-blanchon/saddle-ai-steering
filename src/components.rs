@@ -804,12 +804,7 @@ pub struct CustomSteeringBehavior {
 
 impl CustomSteeringBehavior {
     /// Push a custom contribution into the inbox.
-    pub fn push(
-        &mut self,
-        name: impl Into<String>,
-        tuning: BehaviorTuning,
-        intent: LinearIntent,
-    ) {
+    pub fn push(&mut self, name: impl Into<String>, tuning: BehaviorTuning, intent: LinearIntent) {
         self.contributions.push(CustomContribution {
             name: name.into(),
             tuning,
