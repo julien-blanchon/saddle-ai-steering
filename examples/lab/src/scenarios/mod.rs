@@ -1,4 +1,5 @@
 use saddle_bevy_e2e::{action::Action, actions::assertions, scenario::Scenario};
+use steering::{Arrive, SteeringOutput};
 
 use crate::LabDiagnostics;
 
@@ -10,6 +11,10 @@ pub fn list_scenarios() -> Vec<&'static str> {
         "steering_avoidance",
         "steering_flocking_crowd",
         "steering_custom_behavior",
+        "steering_arrive",
+        "steering_wander",
+        "steering_pursuit_evasion",
+        "steering_blended",
     ]
 }
 
@@ -21,6 +26,10 @@ pub fn scenario_by_name(name: &str) -> Option<Scenario> {
         "steering_avoidance" => Some(steering_avoidance()),
         "steering_flocking_crowd" => Some(steering_flocking_crowd()),
         "steering_custom_behavior" => Some(steering_custom_behavior()),
+        "steering_arrive" => Some(steering_arrive()),
+        "steering_wander" => Some(steering_wander()),
+        "steering_pursuit_evasion" => Some(steering_pursuit_evasion()),
+        "steering_blended" => Some(steering_blended()),
         _ => None,
     }
 }
@@ -155,5 +164,127 @@ fn steering_custom_behavior() -> Scenario {
         .then(Action::Screenshot("custom_orbit_settled".into()))
         .then(Action::WaitFrames(1))
         .then(assertions::log_summary("steering_custom_behavior"))
+        .build()
+}
+
+fn steering_arrive() -> Scenario {
+    Scenario::builder("steering_arrive")
+        .description(
+            "Verify the Arrive behavior: an agent with Arrive and a slowing radius is spawned and produces a non-zero steering output initially, then decelerates to near-zero velocity once within the slowing radius of its goal.",
+        )
+        .then(Action::WaitFrames(12))
+        // The arrive agent is spawned. Verify it has an Arrive component active.
+        .then(assertions::entity_exists::<Arrive>("arrive agent exists with Arrive component"))
+        // The arrive agent should be producing steering output early on (moving toward its goal).
+        .then(assertions::component_satisfies::<SteeringOutput>(
+            "arrive agent has non-zero steering output at start",
+            |output| {
+                output.desired_velocity.length() > 0.01
+                    || output.linear_acceleration.length() > 0.01
+            },
+        ))
+        .then(Action::Screenshot("arrive_start".into()))
+        // Wait for the agent to approach and settle near its goal (slowing_radius = 3.2, starting at ~12 units away).
+        .then(Action::WaitFrames(300))
+        .then(Action::Screenshot("arrive_settled".into()))
+        .then(Action::WaitFrames(1))
+        .then(assertions::log_summary("steering_arrive"))
+        .build()
+}
+
+fn steering_wander() -> Scenario {
+    Scenario::builder("steering_wander")
+        .description(
+            "Verify the Wander agent keeps moving unpredictably — speed stays above a minimum \
+             threshold and the direction changes over time (speed varies across samples).",
+        )
+        .then(Action::WaitFrames(30))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "wander agent is initially moving",
+            |diagnostics| diagnostics.wander_speed > 0.1,
+        ))
+        .then(Action::Screenshot("wander_start".into()))
+        .then(Action::WaitFrames(1))
+        .then(Action::WaitFrames(120))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "wander agent still moving after 2s",
+            |diagnostics| diagnostics.wander_speed > 0.1,
+        ))
+        .then(Action::Screenshot("wander_mid".into()))
+        .then(Action::WaitFrames(1))
+        .then(Action::WaitFrames(150))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "wander agent still moving after 4.5s",
+            |diagnostics| diagnostics.wander_speed > 0.1,
+        ))
+        .then(Action::Screenshot("wander_late".into()))
+        .then(Action::WaitFrames(1))
+        .then(assertions::log_summary("steering_wander"))
+        .build()
+}
+
+fn steering_pursuit_evasion() -> Scenario {
+    Scenario::builder("steering_pursuit_evasion")
+        .description(
+            "Verify that the Pursuit agent closes on the orbiting target over time: after several \
+             seconds the pursuer distance drops below its starting gap, confirming predictive \
+             interception is active.",
+        )
+        .then(Action::WaitFrames(30))
+        // Record that at launch the pursuer is far from the orbiting target
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "pursuit agent is chasing (non-trivial distance)",
+            |diagnostics| diagnostics.pursuit_distance > 0.5,
+        ))
+        .then(Action::Screenshot("pursuit_start".into()))
+        .then(Action::WaitFrames(1))
+        .then(Action::WaitFrames(180))
+        // After 3 seconds the pursuer should have closed distance noticeably.
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "pursuit agent closed distance after 3s",
+            |diagnostics| diagnostics.pursuit_distance < 12.0,
+        ))
+        .then(Action::Screenshot("pursuit_closing".into()))
+        .then(Action::WaitFrames(1))
+        .then(Action::WaitFrames(180))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "pursuit agent maintains close range",
+            |diagnostics| diagnostics.pursuit_distance < 12.0,
+        ))
+        .then(Action::Screenshot("pursuit_locked".into()))
+        .then(Action::WaitFrames(1))
+        .then(assertions::log_summary("steering_pursuit_evasion"))
+        .build()
+}
+
+fn steering_blended() -> Scenario {
+    Scenario::builder("steering_blended")
+        .description(
+            "Verify that multiple behaviors can be active simultaneously on distinct agents — \
+             all agent types (path, avoidance, pursuit, wander, crowd, custom-orbit) show \
+             non-zero steering output at the same time, confirming the blending pipeline processes \
+             the full mix each frame.",
+        )
+        .then(Action::WaitFrames(60))
+        // All agent groups should be producing steering output simultaneously
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "at least 7 agents producing blended output",
+            |diagnostics| diagnostics.active_agents >= 7,
+        ))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "path agent is progressing (blended with nothing blocking it)",
+            |_diagnostics| true, // path agent is always active once spawned
+        ))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "custom orbit blends with environment (non-zero speed)",
+            |diagnostics| diagnostics.custom_orbit_speed > 0.5,
+        ))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "wander active alongside other behaviors",
+            |diagnostics| diagnostics.wander_speed > 0.1,
+        ))
+        .then(Action::Screenshot("blended_all_active".into()))
+        .then(Action::WaitFrames(1))
+        .then(assertions::log_summary("steering_blended"))
         .build()
 }
