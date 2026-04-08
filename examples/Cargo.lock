@@ -5344,6 +5344,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "saddle-ai-steering",
+ "saddle-bevy-e2e",
  "saddle-pane",
  "steering_example_support",
 ]
@@ -5354,6 +5355,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "saddle-ai-steering",
+ "saddle-bevy-e2e",
  "saddle-pane",
  "steering_example_support",
 ]

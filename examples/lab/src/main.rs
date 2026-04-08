@@ -793,11 +793,7 @@ fn update_lab_diagnostics(
     }
 
     if let Ok((transform, kinematics, orbit)) = custom_orbit_agent.single() {
-        let position = Vec3::new(
-            transform.translation.x,
-            0.0,
-            transform.translation.z,
-        );
+        let position = Vec3::new(transform.translation.x, 0.0, transform.translation.z);
         let center = Vec3::new(orbit.center.x, 0.0, orbit.center.z);
         let distance = position.distance(center);
         let radius_error = (distance - orbit.radius).abs();

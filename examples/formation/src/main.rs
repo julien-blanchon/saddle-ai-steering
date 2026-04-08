@@ -1,9 +1,14 @@
+#[cfg(feature = "e2e")]
+mod e2e;
+#[cfg(feature = "e2e")]
+mod scenarios;
+
 use steering_example_support as support;
 
 use bevy::prelude::*;
 use steering::{
     Formation, ObstacleAvoidance, ReciprocalAvoidance, SteeringAgent, SteeringAutoApply,
-    SteeringKinematics, SteeringPlane, SteeringTarget, Wander,
+    SteeringKinematics, SteeringPlane, SteeringSystems, SteeringTarget, Wander,
 };
 
 #[derive(Component)]
@@ -11,6 +16,14 @@ struct Leader;
 
 #[derive(Component)]
 struct Follower;
+
+#[derive(Resource, Default)]
+struct FormationDiagnostics {
+    mode_label: String,
+    follower_count: usize,
+    avg_slot_error: f32,
+    max_slot_error: f32,
+}
 
 fn main() {
     let mut app = App::new();
@@ -23,8 +36,19 @@ fn main() {
         ..default()
     });
     support::configure_3d_app(&mut app, "steering: formation");
+    #[cfg(feature = "e2e")]
+    app.add_plugins(e2e::FormationE2EPlugin);
+    app.init_resource::<FormationDiagnostics>();
     app.add_systems(Startup, setup);
-    app.add_systems(Update, (sync_pane, cycle_formation).chain());
+    app.add_systems(Update, sync_pane);
+    #[cfg(feature = "e2e")]
+    app.add_systems(Update, cycle_formation.after(saddle_bevy_e2e::E2ESet));
+    #[cfg(not(feature = "e2e"))]
+    app.add_systems(Update, cycle_formation);
+    app.add_systems(
+        Update,
+        update_formation_diagnostics.after(SteeringSystems::Apply),
+    );
     app.insert_resource(FormationMode::Wedge);
     app.run();
 }
@@ -238,4 +262,36 @@ fn sync_pane(
         agent.max_speed = pane.max_speed;
         agent.max_acceleration = pane.max_acceleration;
     }
+}
+
+fn update_formation_diagnostics(
+    mode: Res<FormationMode>,
+    leader: Query<&Transform, With<Leader>>,
+    followers: Query<(&Transform, &Formation), With<Follower>>,
+    mut diagnostics: ResMut<FormationDiagnostics>,
+) {
+    let Ok(leader_transform) = leader.single() else {
+        return;
+    };
+
+    let mut total_error = 0.0_f32;
+    let mut max_error = 0.0_f32;
+    let mut follower_count = 0;
+
+    for (transform, formation) in &followers {
+        let slot_world_position = leader_transform.translation + formation.slot_offset;
+        let error = transform.translation.distance(slot_world_position);
+        total_error += error;
+        max_error = max_error.max(error);
+        follower_count += 1;
+    }
+
+    diagnostics.mode_label = mode.label().into();
+    diagnostics.follower_count = follower_count;
+    diagnostics.avg_slot_error = if follower_count > 0 {
+        total_error / follower_count as f32
+    } else {
+        0.0
+    };
+    diagnostics.max_slot_error = max_error;
 }

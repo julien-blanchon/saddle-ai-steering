@@ -1,13 +1,37 @@
+#[cfg(feature = "e2e")]
+mod e2e;
+#[cfg(feature = "e2e")]
+mod scenarios;
+
 use steering_example_support as support;
 
 use bevy::prelude::*;
-use steering::{Arrive, SteeringAgent, SteeringAutoApply, SteeringPlane, SteeringTarget};
+use steering::{
+    Arrive, SteeringAgent, SteeringAutoApply, SteeringPlane, SteeringSystems, SteeringTarget,
+};
 
 #[derive(Component)]
 struct TargetMarker;
 
 #[derive(Component)]
 struct TwoDAgent;
+
+#[derive(Resource)]
+struct Kinematic2dDiagnostics {
+    agent_position: Vec3,
+    target_position: Vec3,
+    distance_to_target: f32,
+}
+
+impl Default for Kinematic2dDiagnostics {
+    fn default() -> Self {
+        Self {
+            agent_position: Vec3::ZERO,
+            target_position: Vec3::ZERO,
+            distance_to_target: f32::MAX,
+        }
+    }
+}
 
 fn main() {
     let mut app = App::new();
@@ -21,8 +45,15 @@ fn main() {
         ..default()
     });
     support::configure_2d_app(&mut app, "steering: kinematic 2d");
+    #[cfg(feature = "e2e")]
+    app.add_plugins(e2e::Kinematic2dE2EPlugin);
+    app.init_resource::<Kinematic2dDiagnostics>();
     app.add_systems(Startup, setup);
     app.add_systems(Update, sync_pane);
+    app.add_systems(
+        Update,
+        update_kinematic_diagnostics.after(SteeringSystems::Apply),
+    );
     app.run();
 }
 
@@ -80,4 +111,23 @@ fn sync_pane(
         arrive.slowing_radius = pane.slowing_radius;
         arrive.arrival_tolerance = pane.arrival_tolerance;
     }
+}
+
+fn update_kinematic_diagnostics(
+    agent: Query<&Transform, With<TwoDAgent>>,
+    target: Query<&Transform, (With<TargetMarker>, Without<TwoDAgent>)>,
+    mut diagnostics: ResMut<Kinematic2dDiagnostics>,
+) {
+    let Ok(agent_transform) = agent.single() else {
+        return;
+    };
+    let Ok(target_transform) = target.single() else {
+        return;
+    };
+
+    diagnostics.agent_position = agent_transform.translation;
+    diagnostics.target_position = target_transform.translation;
+    diagnostics.distance_to_target = agent_transform
+        .translation
+        .distance(target_transform.translation);
 }
