@@ -1,7 +1,10 @@
+mod support;
+
 use saddle_bevy_e2e::{action::Action, actions::assertions, scenario::Scenario};
 use steering::{Arrive, SteeringOutput};
 
 use crate::LabDiagnostics;
+use support::wait_and_capture;
 
 pub fn list_scenarios() -> Vec<&'static str> {
     vec![
@@ -77,11 +80,9 @@ fn steering_path_following() -> Scenario {
         .description(
             "Capture a path follower at the start and midpoints, then assert waypoint progress after a full lap opportunity.",
         )
-        .then(Action::WaitFrames(10))
-        .then(Action::Screenshot("path_start".into()))
+        .then_many(wait_and_capture("path_start", 10))
         .then(Action::WaitFrames(1))
-        .then(Action::WaitFrames(240))
-        .then(Action::Screenshot("path_mid".into()))
+        .then_many(wait_and_capture("path_mid", 240))
         .then(Action::WaitFrames(1))
         .then(Action::WaitFrames(240))
         .then(assertions::resource_satisfies::<LabDiagnostics>(
@@ -97,11 +98,9 @@ fn steering_path_following() -> Scenario {
 fn steering_avoidance() -> Scenario {
     Scenario::builder("steering_avoidance")
         .description("Track the avoidance agent as it approaches a blocking obstacle, bends around it, and ends up past the obstacle with positive clearance.")
-        .then(Action::WaitFrames(12))
-        .then(Action::Screenshot("avoidance_start".into()))
+        .then_many(wait_and_capture("avoidance_start", 12))
         .then(Action::WaitFrames(1))
-        .then(Action::WaitFrames(140))
-        .then(Action::Screenshot("avoidance_mid".into()))
+        .then_many(wait_and_capture("avoidance_mid", 140))
         .then(Action::WaitFrames(1))
         .then(Action::WaitFrames(180))
         .then(assertions::resource_satisfies::<LabDiagnostics>(
@@ -121,8 +120,7 @@ fn steering_flocking_crowd() -> Scenario {
         .description(
             "Let the crowd lanes converge, then verify flocking neighbors and reciprocal avoidance both activate while agents keep a positive separation.",
         )
-        .then(Action::WaitFrames(20))
-        .then(Action::Screenshot("crowd_start".into()))
+        .then_many(wait_and_capture("crowd_start", 20))
         .then(Action::WaitFrames(1))
         .then(Action::WaitFrames(180))
         .then(assertions::resource_satisfies::<LabDiagnostics>(
@@ -145,8 +143,7 @@ fn steering_custom_behavior() -> Scenario {
         .description(
             "Verify the custom orbit behavior: agent reaches orbit speed, maintains radius, and converges to the target orbit within tolerance.",
         )
-        .then(Action::WaitFrames(30))
-        .then(Action::Screenshot("custom_orbit_start".into()))
+        .then_many(wait_and_capture("custom_orbit_start", 30))
         .then(Action::WaitFrames(1))
         .then(assertions::resource_satisfies::<LabDiagnostics>(
             "custom orbit agent is moving",
