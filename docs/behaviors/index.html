@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<script>
+			(() => {
+				document.documentElement.classList.add('js');
+				const storageKey = 'docs-theme';
+				const storedTheme = localStorage.getItem(storageKey);
+				const isDark =
+					storedTheme === 'dark' ||
+					(storedTheme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+				document.documentElement.classList.toggle('dark', isDark);
+				document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+			})();
+		</script>
+		<link href="../../_app/immutable/entry/start.osmQ94HA.js" rel="modulepreload">
+		<link href="../../_app/immutable/chunks/BmOH_7f5.js" rel="modulepreload">
+		<link href="../../_app/immutable/chunks/D6rU7RKI.js" rel="modulepreload">
+		<link href="../../_app/immutable/entry/app.DTTXeH8b.js" rel="modulepreload">
+		<link href="../../_app/immutable/chunks/D2PL5qU_.js" rel="modulepreload">
+		<link href="../../_app/immutable/chunks/DsnmJJEf.js" rel="modulepreload">
+		<link href="../../_app/immutable/chunks/CGbRUU1n.js" rel="modulepreload">
+		<link href="../../_app/immutable/nodes/0.DWFB8q9Q.js" rel="modulepreload">
+		<link href="../../_app/immutable/chunks/DfbcbVtg.js" rel="modulepreload">
+		<link href="../../_app/immutable/chunks/DzN9Cr-l.js" rel="modulepreload">
+		<link href="../../_app/immutable/chunks/D3udy8KQ.js" rel="modulepreload">
+		<link href="../../_app/immutable/nodes/2.FSZET3Va.js" rel="modulepreload">
+		<link href="../../_app/immutable/chunks/rh3cN3PL.js" rel="modulepreload">
+		<link href="../../_app/immutable/nodes/5.BOp3_yHr.js" rel="modulepreload">
+		<link href="../../_app/immutable/chunks/O7QY0ZL7.js" rel="modulepreload">
+		<!--12qhfyh--><meta name="theme-color" content="#ffffff"/> <link rel="icon" type="image/svg+xml" href="../../favicon.svg"/> <meta name="description" content="Reusable steering behaviors for locomotion intent in Bevy"/><!----><!--1bpnej--><!--[0--><meta name="description" content="Behaviors documentation"/><!--]--><!----><title>Behaviors - saddle-ai-steering</title>
+		<link href="../../_app/immutable/assets/manifest.DAGDUwuc.css" rel="stylesheet">
+		<link href="../../_app/immutable/assets/0.Cu___w4E.css" rel="stylesheet">
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents"><!--[--><!--[0--><!--[--><!--[0--><!--[--><main class="relative h-dvh bg-background text-foreground"><div class="fixed inset-x-0 top-0 z-50 flex items-center justify-between border-b border-border bg-background px-4 py-1.5 lg:hidden"><a href="../../" class="inline-flex items-center gap-1 px-2 py-2 text-sm tracking-tight text-foreground"><span class="font-medium tracking-tight text-foreground">saddle-ai-steering</span></a> <button class="-mr-2 inline-flex size-10 items-center justify-center gap-2 rounded-sm text-sm whitespace-nowrap text-foreground transition-colors duration-150 ease-out hover:bg-background-muted lg:hidden" aria-label="Toggle menu"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" preserveAspectRatio="xMidYMid meet" width="20" height="20" aria-hidden="true"><!--[-1--><!--]--><path d="M4 6H28V8H4z"></path><path d="M4 24H28V26H4z"></path><path d="M4 12H28V14H4z"></path><path d="M4 18H28V20H4z"></path></svg><!----></button></div> <!--[-1--><!--]--><!----> <div class="flex h-full w-full min-w-0 lg:grid lg:grid-cols-[22rem_minmax(0,1fr)] lg:pr-4 xl:grid-cols-[22rem_minmax(0,56rem)_18rem] xl:justify-center"><div class="hidden lg:block"><aside class="flex h-dvh flex-col bg-background" aria-label="Documentation sidebar"><div class="flex flex-col gap-4 p-4"><a href="../../" class="flex items-center gap-2"><span class="text-xl font-medium tracking-tight text-foreground">saddle-ai-steering</span></a> <!--[0--><button type="button" class="group inset-shadow relative flex h-9 w-full items-center gap-2 rounded-sm bg-background-inset px-3 py-1.5 text-sm font-medium text-foreground-muted/70 transition-[color] duration-150 ease-out hover:text-foreground-muted"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" preserveAspectRatio="xMidYMid meet" width="16" height="16" aria-hidden="true" class="text-foreground-muted/70"><!--[-1--><!--]--><path d="M29,27.5859l-7.5521-7.5521a11.0177,11.0177,0,1,0-1.4141,1.4141L27.5859,29ZM4,13a9,9,0,1,1,9,9A9.01,9.01,0,0,1,4,13Z"></path></svg><!----> <span class="flex-1 text-left">Search...</span> <!--[0--><kbd class="card pointer-events-none relative hidden h-5 items-center gap-1 rounded-xs bg-background px-1.5 font-mono text-[10px] font-medium text-foreground-muted/70 select-none sm:flex">⌘ K</kbd><!--]--></button><!--]--><!----></div> <div class="relative flex flex-col overflow-hidden flex-1 svelte-1lcbi17"><div class="scrollbar-hide min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto p-4 svelte-1lcbi17" style="mask-image: linear-gradient(to bottom, transparent, black 16px, black calc(100% - 16px), transparent); -webkit-mask-image: linear-gradient(to bottom, transparent, black 16px, black calc(100% - 16px), transparent);"><nav class="flex flex-col space-y-1" aria-label="Documentation pages"><h4 class="mb-2 ml-2 text-xs font-medium tracking-wide text-foreground-muted/70 uppercase">Docs</h4> <!--[--><!--[-1--><a href="../../" class="block rounded-sm px-3 py-1.5 text-sm tracking-normal transition-all duration-150 ease-out text-foreground-muted hover:bg-background-muted hover:text-foreground">Overview</a><!--]--><!--[0--><button class="flex w-full items-center justify-between rounded-sm px-3 py-1.5 text-sm font-medium tracking-normal transition-all duration-150 ease-out hover:bg-background-muted hover:text-foreground text-foreground-muted"><span>Documentation</span> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" preserveAspectRatio="xMidYMid meet" width="16" height="16" aria-hidden="true" class="size-4 transition-transform duration-150"><!--[-1--><!--]--><path d="M22 16 12 26 10.6 24.6 19.2 16 10.6 7.4 12 6z"></path></svg><!----></button> <!--[-1--><!--]--><!--]--><!--[0--><button class="flex w-full items-center justify-between rounded-sm px-3 py-1.5 text-sm font-medium tracking-normal transition-all duration-150 ease-out hover:bg-background-muted hover:text-foreground text-foreground-muted"><span>Demos</span> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" preserveAspectRatio="xMidYMid meet" width="16" height="16" aria-hidden="true" class="size-4 transition-transform duration-150"><!--[-1--><!--]--><path d="M22 16 12 26 10.6 24.6 19.2 16 10.6 7.4 12 6z"></path></svg><!----></button> <!--[-1--><!--]--><!--]--><!--]--></nav><!----></div></div><!----> <div class="flex items-center gap-1 p-4"><!--[0--><button type="button" class="group transition-scale inset-shadow relative inline-flex size-7 items-center justify-center rounded-sm bg-background-inset text-foreground duration-150 ease-out active:scale-[0.95]" aria-label="Switch to dark mode"><span class="sr-only">Switch to dark mode</span> <span class="transition-transform duration-150 ease-out"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" preserveAspectRatio="xMidYMid meet" width="16" height="16" aria-hidden="true"><!--[-1--><!--]--><path d="M16,12a4,4,0,1,1-4,4,4.0045,4.0045,0,0,1,4-4m0-2a6,6,0,1,0,6,6,6,6,0,0,0-6-6Z" transform="translate(0 .005)"></path><path d="M6.854 5.375H8.854V10.333H6.854z" transform="rotate(-45 7.86 7.856)"></path><path d="M2 15.005H7V17.005000000000003H2z"></path><path d="M5.375 23.147H10.333V25.147H5.375z" transform="rotate(-45 7.86 24.149)"></path><path d="M15 25.005H17V30.005H15z"></path><path d="M23.147 21.668H25.147V26.625999999999998H23.147z" transform="rotate(-45 24.152 24.149)"></path><path d="M25 15.005H30V17.005000000000003H25z"></path><path d="M21.668 6.854H26.625999999999998V8.854H21.668z" transform="rotate(-45 24.152 7.856)"></path><path d="M15 2.005H17V7.005H15z"></path></svg><!----></span> <span class="absolute transition-transform duration-150 ease-out scale-0 blur-[2px]"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" preserveAspectRatio="xMidYMid meet" width="16" height="16" aria-hidden="true"><!--[-1--><!--]--><path d="M13.5025,5.4136A15.0755,15.0755,0,0,0,25.096,23.6082a11.1134,11.1134,0,0,1-7.9749,3.3893c-.1385,0-.2782.0051-.4178,0A11.0944,11.0944,0,0,1,13.5025,5.4136M14.98,3a1.0024,1.0024,0,0,0-.1746.0156A13.0959,13.0959,0,0,0,16.63,28.9973c.1641.006.3282,0,.4909,0a13.0724,13.0724,0,0,0,10.702-5.5556,1.0094,1.0094,0,0,0-.7833-1.5644A13.08,13.08,0,0,1,15.8892,4.38,1.0149,1.0149,0,0,0,14.98,3Z"></path></svg><!----></span></button><!--]--> <!--[0--><a class="group transition-scale inset-shadow relative inline-flex size-7 cursor-pointer items-center justify-center rounded-sm bg-background-inset text-foreground duration-150 ease-out active:scale-[0.95]" href="https://github.com/julien-blanchon/saddle-ai-steering" target="_blank" rel="noreferrer" aria-label="Open project repository (opens in a new tab)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" preserveAspectRatio="xMidYMid meet" width="16" height="16" aria-hidden="true" class="size-4 flex-none"><!--[-1--><!--]--><path fill-rule="evenodd" d="M16,2a14,14,0,0,0-4.43,27.28c.7.13,1-.3,1-.67s0-1.21,0-2.38c-3.89.84-4.71-1.88-4.71-1.88A3.71,3.71,0,0,0,6.24,22.3c-1.27-.86.1-.85.1-.85A2.94,2.94,0,0,1,8.48,22.9a3,3,0,0,0,4.08,1.16,2.93,2.93,0,0,1,.88-1.87c-3.1-.36-6.37-1.56-6.37-6.92a5.4,5.4,0,0,1,1.44-3.76,5,5,0,0,1,.14-3.7s1.17-.38,3.85,1.43a13.3,13.3,0,0,1,7,0c2.67-1.81,3.84-1.43,3.84-1.43a5,5,0,0,1,.14,3.7,5.4,5.4,0,0,1,1.44,3.76c0,5.38-3.27,6.56-6.39,6.91a3.33,3.33,0,0,1,.95,2.59c0,1.87,0,3.38,0,3.84s.25.81,1,.67A14,14,0,0,0,16,2Z"></path></svg><!----></a><!--]--></div></aside><!----></div> <div class="inset-shadow relative mx-auto h-full w-full max-w-4xl min-w-0 overflow-hidden border border-border bg-background-inset pt-12 lg:my-4 lg:max-h-[calc(100dvh-2rem)] lg:overflow-visible lg:rounded-xl lg:pt-0"><div class="relative flex flex-col overflow-hidden mx-auto h-full w-full lg:max-h-[calc(100dvh-2rem)] svelte-1lcbi17"><div id="docs-content-container" class="scrollbar-hide min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto rounded-lg overscroll-none flex flex-col gap-8 px-4 py-8 lg:px-8 svelte-1lcbi17" style="mask-image: linear-gradient(to bottom, transparent, black 16px, black calc(100% - 16px), transparent); -webkit-mask-image: linear-gradient(to bottom, transparent, black 16px, black calc(100% - 16px), transparent);"><section class="min-w-0 flex-1 space-y-8"><div class="space-y-4"><!--[-1--><!--]--> <h1 class="scroll-m-20 text-3xl font-medium tracking-tight text-foreground">Behaviors</h1> <!--[0--><p class="max-w-4xl text-base font-normal tracking-normal text-foreground-muted">Behaviors documentation</p><!--]--> <!--[0--><!--[0--><div class="relative z-20 mt-8 flex w-full gap-2 lg:hidden"><!--[0--><div class="inset-shadow w-full rounded-md bg-background-inset p-1.5"><button type="button" aria-live="polite" aria-disabled="false" class="card relative inline-flex h-9 w-full font-medium shrink-0 overflow-hidden items-center justify-center gap-2 rounded-sm bg-background px-4 py-2 text-sm whitespace-nowrap text-foreground transition-[background-color] duration-150 ease-out hover:bg-background-muted disabled:pointer-events-none disabled:opacity-50 has-[>svg]:px-3 [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 [&amp;_svg:not([class*=size-])]:size-4 flex-1"><span class="grid place-items-center" style="grid-template-areas: 'content';"><!----><span class="flex items-center gap-2 font-medium tracking-normal text-foreground will-change-transform" style="grid-area: content;"><!--[-1--><svg role="img" viewBox="0 0 24 24" fill="none" aria-hidden="true" class="size-4 flex-none"><title>Markdown</title><path class="stroke-current" d="M1.212 5.5h21.576c.407 0 .712.317.712.679v11.549a.695.695 0 0 1-.712.677H1.212a.695.695 0 0 1-.712-.678V6.18c0-.362.305-.679.712-.679Z"></path><path class="fill-current" d="M3.03 15.96V7.946h2.425l2.424 2.946 2.424-2.946h2.424v8.014h-2.424v-4.596L7.88 14.31l-2.424-2.946v4.596H3.03Zm15.152 0-3.636-3.89h2.424V7.947h2.424v4.125h2.424l-3.636 3.889Z"></path></svg><!--]--> <span>Copy Markdown</span></span><!----></span></button></div><!--]--> <!--[0--><div class="inset-shadow relative rounded-md bg-background-inset p-1.5"><button id="mobile-doc-actions-menu-trigger" type="button" class="card relative inline-flex h-9 w-full font-medium shrink-0 overflow-hidden items-center justify-center gap-2 rounded-sm bg-background px-4 py-2 text-sm whitespace-nowrap text-foreground transition-[background-color] duration-150 ease-out hover:bg-background-muted disabled:pointer-events-none disabled:opacity-50 has-[>svg]:px-3 [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 [&amp;_svg:not([class*=size-])]:size-4 flex-1 w-auto! px-2.5!" aria-label="More actions" aria-haspopup="menu" aria-controls="mobile-doc-actions-menu" aria-expanded="false"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" preserveAspectRatio="xMidYMid meet" width="16" height="16" aria-hidden="true" class="size-4"><!--[-1--><!--]--><circle cx="8" cy="16" r="2"></circle><circle cx="16" cy="16" r="2"></circle><circle cx="24" cy="16" r="2"></circle></svg><!----></button> <!--[-1--><!--]--></div><!--]--></div><!--]--><!--]--></div> <hr class="text-border"/> <div><!--[--><article data-doc-content="" class="w-full max-w-4xl"><!----><h2><code>Seek</code></h2>
+<p>Moves directly toward a point or entity at full desired speed.</p>
+<ul>
+<li>Needs:
+<code>SteeringTarget</code></li>
+<li>Composes well with:
+<code>ObstacleAvoidance</code>, <code>PathFollowing</code></li>
+<li>Failure modes:
+overshoot when used alone on a final goal</li>
+<li>Typical fix:
+pair with <code>Arrive</code> near the endpoint or switch to <code>PathFollowing</code> for authored routes</li>
+</ul>
+<h2><code>Flee</code></h2>
+<p>Moves directly away from a threat.</p>
+<ul>
+<li>Needs:
+<code>SteeringTarget</code></li>
+<li>Optional:
+<code>panic_distance</code></li>
+<li>Failure modes:
+agents can run indefinitely or oscillate if the threat is close and another behavior keeps pulling them back</li>
+<li>Typical fix:
+use a higher flee priority or cap activation with <code>panic_distance</code></li>
+</ul>
+<h2><code>Arrive</code></h2>
+<p>Like seek, but slows inside a configurable radius and settles inside a tolerance.</p>
+<ul>
+<li>Needs:
+<code>SteeringTarget</code></li>
+<li>Key tuning:
+<code>slowing_radius</code>, <code>arrival_tolerance</code>, <code>speed_curve_exponent</code></li>
+<li>Failure modes:
+too-small slowing radius causes overshoot
+too-large arrival tolerance causes visibly early stopping</li>
+</ul>
+<h2><code>Pursue</code></h2>
+<p>Predicts a moving target and then seeks that predicted position.</p>
+<ul>
+<li>Needs:
+target position
+target velocity</li>
+<li>Works when target velocity is missing:
+yes, but prediction collapses to a simple seek</li>
+<li>Failure modes:
+prediction becomes too aggressive for far-away fast targets</li>
+<li>Typical fix:
+lower <code>lead_scale</code> or clamp <code>max_prediction_time</code></li>
+</ul>
+<h2><code>Evade</code></h2>
+<p>Predicts a moving threat and flees from the predicted position.</p>
+<ul>
+<li>Needs:
+target position
+target velocity</li>
+<li>Typical use:
+escape drones, dodging animals, defensive civilians</li>
+<li>Failure modes:
+can fight high-priority path or seek behaviors if priorities are poorly tuned</li>
+</ul>
+<h2><code>Wander</code></h2>
+<p>Uses a deterministic seeded drift to move a wander-circle target over time.</p>
+<ul>
+<li>Needs:
+<code>Wander</code>
+<code>WanderState</code> is auto-created by the plugin</li>
+<li>Determinism:
+seeded xorshift state per entity</li>
+<li>Failure modes:
+high jitter looks noisy
+very low acceleration makes the wander target drift faster than the body can follow</li>
+</ul>
+<h2><code>ObstacleAvoidance</code></h2>
+<p>Evaluates the local probe corridor against explicit <code>SteeringObstacle</code> entities.</p>
+<ul>
+<li>Needs:
+<code>ObstacleAvoidance</code>
+nearby <code>SteeringObstacle</code> entities</li>
+<li>Strengths:
+easy to debug
+no physics dependency
+good fit for authored static obstacles</li>
+<li>Limits:
+not reciprocal avoidance
+does not solve dense crowd behavior
+scales linearly with obstacle count</li>
+</ul>
+<h2><code>PathFollowing</code></h2>
+<p>Follows a waypoint path using waypoint tolerance and lookahead.</p>
+<ul>
+<li>Needs:
+<code>SteeringPath</code>
+<code>PathFollowingState</code> is auto-created by the plugin</li>
+<li>Supports:
+<code>Once</code>
+<code>Loop</code>
+<code>PingPong</code></li>
+<li>Internals:
+seek-style motion on regular segments
+arrive-style settle near a terminal once-path endpoint</li>
+<li>Failure modes:
+too-small lookahead can pin agents to corners
+too-large lookahead can skip intended tight authored turns</li>
+</ul>
+<h2><code>Flocking</code></h2>
+<p>Boids-style local group motion: separation, alignment, and cohesion around nearby agents.</p>
+<ul>
+<li>Needs:
+<code>Flocking</code> component, other <code>SteeringAgent</code> entities nearby</li>
+<li>Key tuning:
+<code>separation_weight</code>, <code>alignment_weight</code>, <code>cohesion_weight</code>, <code>max_neighbors</code></li>
+<li>Failure modes:
+too-strong separation can fragment a group
+too-strong cohesion can collapse agents into a single point</li>
+<li>Typical use:
+bird flocks, fish schools, drone swarms, ambient crowd life</li>
+</ul>
+<h2><code>ReciprocalAvoidance</code></h2>
+<p>Lightweight agent-agent collision avoidance that deflects velocity based on predicted time-to-collision.</p>
+<ul>
+<li>Needs:
+<code>ReciprocalAvoidance</code> component, other <code>SteeringAgent</code> entities nearby</li>
+<li>Key tuning:
+<code>time_horizon</code>, <code>comfort_distance</code>, <code>side_bias</code></li>
+<li>Limits:
+not a full ORCA solver; suitable for medium-density crowds</li>
+<li>Composes well with:
+<code>PathFollowing</code>, <code>Flocking</code></li>
+</ul>
+<h2><code>LeaderFollowing</code></h2>
+<p>Follow behind a leader entity. Arrives at a point <code>behind_distance</code> behind the leader&#39;s velocity direction. If the agent is ahead of the leader within <code>leader_sight_radius</code>, it evades sideways to clear the leader&#39;s path.</p>
+<ul>
+<li>Needs:
+<code>SteeringTarget</code> for the leader</li>
+<li>Key tuning:
+<code>behind_distance</code>, <code>leader_sight_radius</code></li>
+<li>Composes well with:
+<code>ReciprocalAvoidance</code> (to avoid other followers), <code>ObstacleAvoidance</code></li>
+<li>Failure modes:
+leader with no velocity (stationary) defaults to following behind along the Z axis</li>
+</ul>
+<h2><code>Formation</code></h2>
+<p>Hold a slot position relative to an anchor entity. The <code>slot_offset</code> is defined in anchor-local space and rotated by the anchor&#39;s velocity direction each frame. Uses arrive behavior internally.</p>
+<ul>
+<li>Needs:
+<code>SteeringTarget</code> for the anchor, <code>slot_offset: Vec3</code></li>
+<li>Typical use:
+military units, escort missions, NPC groups</li>
+<li>Composes well with:
+<code>ReciprocalAvoidance</code>, <code>ObstacleAvoidance</code></li>
+<li>Failure modes:
+anchor with no velocity causes the slot orientation to default to the Z axis</li>
+</ul>
+<h2><code>Containment</code></h2>
+<p>Keep agents within a bounding sphere. The behavior activates when the agent enters the margin zone and steers back toward the center with force proportional to proximity to the boundary.</p>
+<ul>
+<li>Needs:
+<code>center: Vec3</code>, <code>radius: f32</code></li>
+<li>Key tuning:
+<code>margin</code> controls how early the behavior activates</li>
+<li>Typical use:
+arena boundaries, world edges, prevent agents from wandering off</li>
+<li>Composes well with:
+any behavior that might drive agents out of bounds (<code>Wander</code>, <code>Flee</code>, <code>Flocking</code>)</li>
+</ul>
+<h2>Composition Guidance</h2>
+<p>Recommended defaults:</p>
+<ul>
+<li>Seek target with static obstacles:
+<code>Seek</code> + <code>ObstacleAvoidance</code></li>
+<li>Smooth stop at a goal:
+<code>Arrive</code></li>
+<li>Moving target chase:
+<code>Pursue</code> + <code>ObstacleAvoidance</code></li>
+<li>Patrol:
+<code>PathFollowing</code></li>
+<li>Ambient life:
+<code>Wander</code></li>
+<li>Predator-prey:
+<code>Pursue</code> + <code>ObstacleAvoidance</code> + <code>Containment</code> for predators, <code>Evade</code> + <code>Wander</code> + <code>ObstacleAvoidance</code> + <code>Containment</code> for prey</li>
+<li>Formation movement:
+<code>Formation</code> + <code>ReciprocalAvoidance</code> + <code>ObstacleAvoidance</code> for followers, <code>Wander</code> + <code>ObstacleAvoidance</code> + <code>Containment</code> for the leader</li>
+<li>Crowd navigation:
+<code>PathFollowing</code> + <code>ReciprocalAvoidance</code> + <code>ObstacleAvoidance</code> + <code>Containment</code></li>
+</ul>
+<p>When multiple behaviors are active:</p>
+<ul>
+<li>use <code>PrioritizedAccumulation</code> if avoidance or evade must dominate</li>
+<li>use <code>WeightedBlend</code> only when softer compromises are acceptable</li>
+</ul>
+<!----></article> <!----><!--]--><!----> <!--[-1--><!--]--><!----></div></section><!----></div></div><!----></div> <aside class="hidden xl:block xl:w-full xl:py-8 xl:pr-4 xl:pl-4" aria-label="Table of contents and document actions"><div class="sticky top-8 flex h-full max-h-[calc(100dvh-4rem)] min-h-0 flex-col"><!--[0--><div class="min-h-0 flex-1"><div class="contents"><!--[-1--><div class="hidden text-sm tracking-normal text-foreground-muted/70 lg:block">No headings</div><!--]--></div><!----></div><!--]--> <!--[0--><!--[0--><div class="mt-auto"><div class="flex flex-col gap-1 text-sm"><!--[0--><button type="button" aria-live="polite" aria-disabled="false" class="group/option flex items-center gap-2 overflow-hidden rounded-sm px-3 py-1.5 text-left font-medium tracking-normal text-foreground-muted transition-colors duration-150 ease-out hover:bg-background-muted hover:text-foreground"><span class="grid" style="grid-template-areas: 'content';"><!----><span class="flex items-center gap-2" style="grid-area: content;"><!--[-1--><svg role="img" viewBox="0 0 24 24" fill="none" aria-hidden="true" class="size-4 flex-none"><title>Markdown</title><path class="stroke-current" d="M1.212 5.5h21.576c.407 0 .712.317.712.679v11.549a.695.695 0 0 1-.712.677H1.212a.695.695 0 0 1-.712-.678V6.18c0-.362.305-.679.712-.679Z"></path><path class="fill-current" d="M3.03 15.96V7.946h2.425l2.424 2.946 2.424-2.946h2.424v8.014h-2.424v-4.596L7.88 14.31l-2.424-2.946v4.596H3.03Zm15.152 0-3.636-3.89h2.424V7.947h2.424v4.125h2.424l-3.636 3.889Z"></path></svg><!--]--> <span>Copy as Markdown</span></span><!----></span></button><!--]--> <!--[0--><a class="group/option flex items-center gap-2 rounded-sm px-3 py-1.5 text-left font-medium tracking-normal text-foreground-muted transition-colors duration-150 ease-out hover:bg-background-muted hover:text-foreground" href="https://github.com/julien-blanchon/saddle-ai-steering/blob/main/docs//saddle-ai-steering/docs/behaviors.md" target="_blank" rel="noreferrer"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" preserveAspectRatio="xMidYMid meet" width="16" height="16" aria-hidden="true" class="size-4 flex-none"><!--[-1--><!--]--><path fill-rule="evenodd" d="M16,2a14,14,0,0,0-4.43,27.28c.7.13,1-.3,1-.67s0-1.21,0-2.38c-3.89.84-4.71-1.88-4.71-1.88A3.71,3.71,0,0,0,6.24,22.3c-1.27-.86.1-.85.1-.85A2.94,2.94,0,0,1,8.48,22.9a3,3,0,0,0,4.08,1.16,2.93,2.93,0,0,1,.88-1.87c-3.1-.36-6.37-1.56-6.37-6.92a5.4,5.4,0,0,1,1.44-3.76,5,5,0,0,1,.14-3.7s1.17-.38,3.85,1.43a13.3,13.3,0,0,1,7,0c2.67-1.81,3.84-1.43,3.84-1.43a5,5,0,0,1,.14,3.7,5.4,5.4,0,0,1,1.44,3.76c0,5.38-3.27,6.56-6.39,6.91a3.33,3.33,0,0,1,.95,2.59c0,1.87,0,3.38,0,3.84s.25.81,1,.67A14,14,0,0,0,16,2Z"></path></svg><!----> <span>Open in GitHub</span> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" preserveAspectRatio="xMidYMid meet" width="16" height="16" aria-hidden="true" class="ml-auto size-4 flex-none"><!--[-1--><!--]--><path d="M26,28H6a2.0027,2.0027,0,0,1-2-2V6A2.0027,2.0027,0,0,1,6,4H16V6H6V26H26V16h2V26A2.0027,2.0027,0,0,1,26,28Z"></path><path d="M20 2 20 4 26.586 4 18 12.586 19.414 14 28 5.414 28 12 30 12 30 2 20 2z"></path></svg><!----> <span class="sr-only">(opens in a new tab)</span></a><!--]--> <!--[-1--><!--]--> <!--[-1--><!--]--></div></div><!--]--><!--]--></div></aside></div></main><!--]--><!--]--><!----> <!--[0--><!--[-1--><!--]--><!--]--><!--]--><!--]--> <!--[-1--><!--]--><!--]-->
+			
+			<script>
+				{
+					__sveltekit_1sw6f5r = {
+						base: new URL("../..", location).pathname.slice(0, -1),
+						assets: "/saddle-ai-steering"
+					};
+
+					const element = document.currentScript.parentElement;
+
+					Promise.all([
+						import("../../_app/immutable/entry/start.osmQ94HA.js"),
+						import("../../_app/immutable/entry/app.DTTXeH8b.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element, {
+							node_ids: [0, 2, 5],
+							data: [null,null,{type:"data",data:{html:"\u003Ch2>\u003Ccode>Seek\u003C/code>\u003C/h2>\n\u003Cp>Moves directly toward a point or entity at full desired speed.\u003C/p>\n\u003Cul>\n\u003Cli>Needs:\n\u003Ccode>SteeringTarget\u003C/code>\u003C/li>\n\u003Cli>Composes well with:\n\u003Ccode>ObstacleAvoidance\u003C/code>, \u003Ccode>PathFollowing\u003C/code>\u003C/li>\n\u003Cli>Failure modes:\novershoot when used alone on a final goal\u003C/li>\n\u003Cli>Typical fix:\npair with \u003Ccode>Arrive\u003C/code> near the endpoint or switch to \u003Ccode>PathFollowing\u003C/code> for authored routes\u003C/li>\n\u003C/ul>\n\u003Ch2>\u003Ccode>Flee\u003C/code>\u003C/h2>\n\u003Cp>Moves directly away from a threat.\u003C/p>\n\u003Cul>\n\u003Cli>Needs:\n\u003Ccode>SteeringTarget\u003C/code>\u003C/li>\n\u003Cli>Optional:\n\u003Ccode>panic_distance\u003C/code>\u003C/li>\n\u003Cli>Failure modes:\nagents can run indefinitely or oscillate if the threat is close and another behavior keeps pulling them back\u003C/li>\n\u003Cli>Typical fix:\nuse a higher flee priority or cap activation with \u003Ccode>panic_distance\u003C/code>\u003C/li>\n\u003C/ul>\n\u003Ch2>\u003Ccode>Arrive\u003C/code>\u003C/h2>\n\u003Cp>Like seek, but slows inside a configurable radius and settles inside a tolerance.\u003C/p>\n\u003Cul>\n\u003Cli>Needs:\n\u003Ccode>SteeringTarget\u003C/code>\u003C/li>\n\u003Cli>Key tuning:\n\u003Ccode>slowing_radius\u003C/code>, \u003Ccode>arrival_tolerance\u003C/code>, \u003Ccode>speed_curve_exponent\u003C/code>\u003C/li>\n\u003Cli>Failure modes:\ntoo-small slowing radius causes overshoot\ntoo-large arrival tolerance causes visibly early stopping\u003C/li>\n\u003C/ul>\n\u003Ch2>\u003Ccode>Pursue\u003C/code>\u003C/h2>\n\u003Cp>Predicts a moving target and then seeks that predicted position.\u003C/p>\n\u003Cul>\n\u003Cli>Needs:\ntarget position\ntarget velocity\u003C/li>\n\u003Cli>Works when target velocity is missing:\nyes, but prediction collapses to a simple seek\u003C/li>\n\u003Cli>Failure modes:\nprediction becomes too aggressive for far-away fast targets\u003C/li>\n\u003Cli>Typical fix:\nlower \u003Ccode>lead_scale\u003C/code> or clamp \u003Ccode>max_prediction_time\u003C/code>\u003C/li>\n\u003C/ul>\n\u003Ch2>\u003Ccode>Evade\u003C/code>\u003C/h2>\n\u003Cp>Predicts a moving threat and flees from the predicted position.\u003C/p>\n\u003Cul>\n\u003Cli>Needs:\ntarget position\ntarget velocity\u003C/li>\n\u003Cli>Typical use:\nescape drones, dodging animals, defensive civilians\u003C/li>\n\u003Cli>Failure modes:\ncan fight high-priority path or seek behaviors if priorities are poorly tuned\u003C/li>\n\u003C/ul>\n\u003Ch2>\u003Ccode>Wander\u003C/code>\u003C/h2>\n\u003Cp>Uses a deterministic seeded drift to move a wander-circle target over time.\u003C/p>\n\u003Cul>\n\u003Cli>Needs:\n\u003Ccode>Wander\u003C/code>\n\u003Ccode>WanderState\u003C/code> is auto-created by the plugin\u003C/li>\n\u003Cli>Determinism:\nseeded xorshift state per entity\u003C/li>\n\u003Cli>Failure modes:\nhigh jitter looks noisy\nvery low acceleration makes the wander target drift faster than the body can follow\u003C/li>\n\u003C/ul>\n\u003Ch2>\u003Ccode>ObstacleAvoidance\u003C/code>\u003C/h2>\n\u003Cp>Evaluates the local probe corridor against explicit \u003Ccode>SteeringObstacle\u003C/code> entities.\u003C/p>\n\u003Cul>\n\u003Cli>Needs:\n\u003Ccode>ObstacleAvoidance\u003C/code>\nnearby \u003Ccode>SteeringObstacle\u003C/code> entities\u003C/li>\n\u003Cli>Strengths:\neasy to debug\nno physics dependency\ngood fit for authored static obstacles\u003C/li>\n\u003Cli>Limits:\nnot reciprocal avoidance\ndoes not solve dense crowd behavior\nscales linearly with obstacle count\u003C/li>\n\u003C/ul>\n\u003Ch2>\u003Ccode>PathFollowing\u003C/code>\u003C/h2>\n\u003Cp>Follows a waypoint path using waypoint tolerance and lookahead.\u003C/p>\n\u003Cul>\n\u003Cli>Needs:\n\u003Ccode>SteeringPath\u003C/code>\n\u003Ccode>PathFollowingState\u003C/code> is auto-created by the plugin\u003C/li>\n\u003Cli>Supports:\n\u003Ccode>Once\u003C/code>\n\u003Ccode>Loop\u003C/code>\n\u003Ccode>PingPong\u003C/code>\u003C/li>\n\u003Cli>Internals:\nseek-style motion on regular segments\narrive-style settle near a terminal once-path endpoint\u003C/li>\n\u003Cli>Failure modes:\ntoo-small lookahead can pin agents to corners\ntoo-large lookahead can skip intended tight authored turns\u003C/li>\n\u003C/ul>\n\u003Ch2>\u003Ccode>Flocking\u003C/code>\u003C/h2>\n\u003Cp>Boids-style local group motion: separation, alignment, and cohesion around nearby agents.\u003C/p>\n\u003Cul>\n\u003Cli>Needs:\n\u003Ccode>Flocking\u003C/code> component, other \u003Ccode>SteeringAgent\u003C/code> entities nearby\u003C/li>\n\u003Cli>Key tuning:\n\u003Ccode>separation_weight\u003C/code>, \u003Ccode>alignment_weight\u003C/code>, \u003Ccode>cohesion_weight\u003C/code>, \u003Ccode>max_neighbors\u003C/code>\u003C/li>\n\u003Cli>Failure modes:\ntoo-strong separation can fragment a group\ntoo-strong cohesion can collapse agents into a single point\u003C/li>\n\u003Cli>Typical use:\nbird flocks, fish schools, drone swarms, ambient crowd life\u003C/li>\n\u003C/ul>\n\u003Ch2>\u003Ccode>ReciprocalAvoidance\u003C/code>\u003C/h2>\n\u003Cp>Lightweight agent-agent collision avoidance that deflects velocity based on predicted time-to-collision.\u003C/p>\n\u003Cul>\n\u003Cli>Needs:\n\u003Ccode>ReciprocalAvoidance\u003C/code> component, other \u003Ccode>SteeringAgent\u003C/code> entities nearby\u003C/li>\n\u003Cli>Key tuning:\n\u003Ccode>time_horizon\u003C/code>, \u003Ccode>comfort_distance\u003C/code>, \u003Ccode>side_bias\u003C/code>\u003C/li>\n\u003Cli>Limits:\nnot a full ORCA solver; suitable for medium-density crowds\u003C/li>\n\u003Cli>Composes well with:\n\u003Ccode>PathFollowing\u003C/code>, \u003Ccode>Flocking\u003C/code>\u003C/li>\n\u003C/ul>\n\u003Ch2>\u003Ccode>LeaderFollowing\u003C/code>\u003C/h2>\n\u003Cp>Follow behind a leader entity. Arrives at a point \u003Ccode>behind_distance\u003C/code> behind the leader&#39;s velocity direction. If the agent is ahead of the leader within \u003Ccode>leader_sight_radius\u003C/code>, it evades sideways to clear the leader&#39;s path.\u003C/p>\n\u003Cul>\n\u003Cli>Needs:\n\u003Ccode>SteeringTarget\u003C/code> for the leader\u003C/li>\n\u003Cli>Key tuning:\n\u003Ccode>behind_distance\u003C/code>, \u003Ccode>leader_sight_radius\u003C/code>\u003C/li>\n\u003Cli>Composes well with:\n\u003Ccode>ReciprocalAvoidance\u003C/code> (to avoid other followers), \u003Ccode>ObstacleAvoidance\u003C/code>\u003C/li>\n\u003Cli>Failure modes:\nleader with no velocity (stationary) defaults to following behind along the Z axis\u003C/li>\n\u003C/ul>\n\u003Ch2>\u003Ccode>Formation\u003C/code>\u003C/h2>\n\u003Cp>Hold a slot position relative to an anchor entity. The \u003Ccode>slot_offset\u003C/code> is defined in anchor-local space and rotated by the anchor&#39;s velocity direction each frame. Uses arrive behavior internally.\u003C/p>\n\u003Cul>\n\u003Cli>Needs:\n\u003Ccode>SteeringTarget\u003C/code> for the anchor, \u003Ccode>slot_offset: Vec3\u003C/code>\u003C/li>\n\u003Cli>Typical use:\nmilitary units, escort missions, NPC groups\u003C/li>\n\u003Cli>Composes well with:\n\u003Ccode>ReciprocalAvoidance\u003C/code>, \u003Ccode>ObstacleAvoidance\u003C/code>\u003C/li>\n\u003Cli>Failure modes:\nanchor with no velocity causes the slot orientation to default to the Z axis\u003C/li>\n\u003C/ul>\n\u003Ch2>\u003Ccode>Containment\u003C/code>\u003C/h2>\n\u003Cp>Keep agents within a bounding sphere. The behavior activates when the agent enters the margin zone and steers back toward the center with force proportional to proximity to the boundary.\u003C/p>\n\u003Cul>\n\u003Cli>Needs:\n\u003Ccode>center: Vec3\u003C/code>, \u003Ccode>radius: f32\u003C/code>\u003C/li>\n\u003Cli>Key tuning:\n\u003Ccode>margin\u003C/code> controls how early the behavior activates\u003C/li>\n\u003Cli>Typical use:\narena boundaries, world edges, prevent agents from wandering off\u003C/li>\n\u003Cli>Composes well with:\nany behavior that might drive agents out of bounds (\u003Ccode>Wander\u003C/code>, \u003Ccode>Flee\u003C/code>, \u003Ccode>Flocking\u003C/code>)\u003C/li>\n\u003C/ul>\n\u003Ch2>Composition Guidance\u003C/h2>\n\u003Cp>Recommended defaults:\u003C/p>\n\u003Cul>\n\u003Cli>Seek target with static obstacles:\n\u003Ccode>Seek\u003C/code> + \u003Ccode>ObstacleAvoidance\u003C/code>\u003C/li>\n\u003Cli>Smooth stop at a goal:\n\u003Ccode>Arrive\u003C/code>\u003C/li>\n\u003Cli>Moving target chase:\n\u003Ccode>Pursue\u003C/code> + \u003Ccode>ObstacleAvoidance\u003C/code>\u003C/li>\n\u003Cli>Patrol:\n\u003Ccode>PathFollowing\u003C/code>\u003C/li>\n\u003Cli>Ambient life:\n\u003Ccode>Wander\u003C/code>\u003C/li>\n\u003Cli>Predator-prey:\n\u003Ccode>Pursue\u003C/code> + \u003Ccode>ObstacleAvoidance\u003C/code> + \u003Ccode>Containment\u003C/code> for predators, \u003Ccode>Evade\u003C/code> + \u003Ccode>Wander\u003C/code> + \u003Ccode>ObstacleAvoidance\u003C/code> + \u003Ccode>Containment\u003C/code> for prey\u003C/li>\n\u003Cli>Formation movement:\n\u003Ccode>Formation\u003C/code> + \u003Ccode>ReciprocalAvoidance\u003C/code> + \u003Ccode>ObstacleAvoidance\u003C/code> for followers, \u003Ccode>Wander\u003C/code> + \u003Ccode>ObstacleAvoidance\u003C/code> + \u003Ccode>Containment\u003C/code> for the leader\u003C/li>\n\u003Cli>Crowd navigation:\n\u003Ccode>PathFollowing\u003C/code> + \u003Ccode>ReciprocalAvoidance\u003C/code> + \u003Ccode>ObstacleAvoidance\u003C/code> + \u003Ccode>Containment\u003C/code>\u003C/li>\n\u003C/ul>\n\u003Cp>When multiple behaviors are active:\u003C/p>\n\u003Cul>\n\u003Cli>use \u003Ccode>PrioritizedAccumulation\u003C/code> if avoidance or evade must dominate\u003C/li>\n\u003Cli>use \u003Ccode>WeightedBlend\u003C/code> only when softer compromises are acceptable\u003C/li>\n\u003C/ul>\n",title:"Behaviors",description:"Behaviors documentation",rawMarkdown:"## `Seek`\n\nMoves directly toward a point or entity at full desired speed.\n\n- Needs:\n  `SteeringTarget`\n- Composes well with:\n  `ObstacleAvoidance`, `PathFollowing`\n- Failure modes:\n  overshoot when used alone on a final goal\n- Typical fix:\n  pair with `Arrive` near the endpoint or switch to `PathFollowing` for authored routes\n\n## `Flee`\n\nMoves directly away from a threat.\n\n- Needs:\n  `SteeringTarget`\n- Optional:\n  `panic_distance`\n- Failure modes:\n  agents can run indefinitely or oscillate if the threat is close and another behavior keeps pulling them back\n- Typical fix:\n  use a higher flee priority or cap activation with `panic_distance`\n\n## `Arrive`\n\nLike seek, but slows inside a configurable radius and settles inside a tolerance.\n\n- Needs:\n  `SteeringTarget`\n- Key tuning:\n  `slowing_radius`, `arrival_tolerance`, `speed_curve_exponent`\n- Failure modes:\n  too-small slowing radius causes overshoot\n  too-large arrival tolerance causes visibly early stopping\n\n## `Pursue`\n\nPredicts a moving target and then seeks that predicted position.\n\n- Needs:\n  target position\n  target velocity\n- Works when target velocity is missing:\n  yes, but prediction collapses to a simple seek\n- Failure modes:\n  prediction becomes too aggressive for far-away fast targets\n- Typical fix:\n  lower `lead_scale` or clamp `max_prediction_time`\n\n## `Evade`\n\nPredicts a moving threat and flees from the predicted position.\n\n- Needs:\n  target position\n  target velocity\n- Typical use:\n  escape drones, dodging animals, defensive civilians\n- Failure modes:\n  can fight high-priority path or seek behaviors if priorities are poorly tuned\n\n## `Wander`\n\nUses a deterministic seeded drift to move a wander-circle target over time.\n\n- Needs:\n  `Wander`\n  `WanderState` is auto-created by the plugin\n- Determinism:\n  seeded xorshift state per entity\n- Failure modes:\n  high jitter looks noisy\n  very low acceleration makes the wander target drift faster than the body can follow\n\n## `ObstacleAvoidance`\n\nEvaluates the local probe corridor against explicit `SteeringObstacle` entities.\n\n- Needs:\n  `ObstacleAvoidance`\n  nearby `SteeringObstacle` entities\n- Strengths:\n  easy to debug\n  no physics dependency\n  good fit for authored static obstacles\n- Limits:\n  not reciprocal avoidance\n  does not solve dense crowd behavior\n  scales linearly with obstacle count\n\n## `PathFollowing`\n\nFollows a waypoint path using waypoint tolerance and lookahead.\n\n- Needs:\n  `SteeringPath`\n  `PathFollowingState` is auto-created by the plugin\n- Supports:\n  `Once`\n  `Loop`\n  `PingPong`\n- Internals:\n  seek-style motion on regular segments\n  arrive-style settle near a terminal once-path endpoint\n- Failure modes:\n  too-small lookahead can pin agents to corners\n  too-large lookahead can skip intended tight authored turns\n\n## `Flocking`\n\nBoids-style local group motion: separation, alignment, and cohesion around nearby agents.\n\n- Needs:\n  `Flocking` component, other `SteeringAgent` entities nearby\n- Key tuning:\n  `separation_weight`, `alignment_weight`, `cohesion_weight`, `max_neighbors`\n- Failure modes:\n  too-strong separation can fragment a group\n  too-strong cohesion can collapse agents into a single point\n- Typical use:\n  bird flocks, fish schools, drone swarms, ambient crowd life\n\n## `ReciprocalAvoidance`\n\nLightweight agent-agent collision avoidance that deflects velocity based on predicted time-to-collision.\n\n- Needs:\n  `ReciprocalAvoidance` component, other `SteeringAgent` entities nearby\n- Key tuning:\n  `time_horizon`, `comfort_distance`, `side_bias`\n- Limits:\n  not a full ORCA solver; suitable for medium-density crowds\n- Composes well with:\n  `PathFollowing`, `Flocking`\n\n## `LeaderFollowing`\n\nFollow behind a leader entity. Arrives at a point `behind_distance` behind the leader's velocity direction. If the agent is ahead of the leader within `leader_sight_radius`, it evades sideways to clear the leader's path.\n\n- Needs:\n  `SteeringTarget` for the leader\n- Key tuning:\n  `behind_distance`, `leader_sight_radius`\n- Composes well with:\n  `ReciprocalAvoidance` (to avoid other followers), `ObstacleAvoidance`\n- Failure modes:\n  leader with no velocity (stationary) defaults to following behind along the Z axis\n\n## `Formation`\n\nHold a slot position relative to an anchor entity. The `slot_offset` is defined in anchor-local space and rotated by the anchor's velocity direction each frame. Uses arrive behavior internally.\n\n- Needs:\n  `SteeringTarget` for the anchor, `slot_offset: Vec3`\n- Typical use:\n  military units, escort missions, NPC groups\n- Composes well with:\n  `ReciprocalAvoidance`, `ObstacleAvoidance`\n- Failure modes:\n  anchor with no velocity causes the slot orientation to default to the Z axis\n\n## `Containment`\n\nKeep agents within a bounding sphere. The behavior activates when the agent enters the margin zone and steers back toward the center with force proportional to proximity to the boundary.\n\n- Needs:\n  `center: Vec3`, `radius: f32`\n- Key tuning:\n  `margin` controls how early the behavior activates\n- Typical use:\n  arena boundaries, world edges, prevent agents from wandering off\n- Composes well with:\n  any behavior that might drive agents out of bounds (`Wander`, `Flee`, `Flocking`)\n\n## Composition Guidance\n\nRecommended defaults:\n\n- Seek target with static obstacles:\n  `Seek` + `ObstacleAvoidance`\n- Smooth stop at a goal:\n  `Arrive`\n- Moving target chase:\n  `Pursue` + `ObstacleAvoidance`\n- Patrol:\n  `PathFollowing`\n- Ambient life:\n  `Wander`\n- Predator-prey:\n  `Pursue` + `ObstacleAvoidance` + `Containment` for predators, `Evade` + `Wander` + `ObstacleAvoidance` + `Containment` for prey\n- Formation movement:\n  `Formation` + `ReciprocalAvoidance` + `ObstacleAvoidance` for followers, `Wander` + `ObstacleAvoidance` + `Containment` for the leader\n- Crowd navigation:\n  `PathFollowing` + `ReciprocalAvoidance` + `ObstacleAvoidance` + `Containment`\n\nWhen multiple behaviors are active:\n\n- use `PrioritizedAccumulation` if avoidance or evade must dominate\n- use `WeightedBlend` only when softer compromises are acceptable\n",slug:"behaviors"},uses:{params:["slug"]}}],
+							form: null,
+							error: null
+						});
+					});
+				}
+			</script>
+		</div>
+	</body>
+</html>
